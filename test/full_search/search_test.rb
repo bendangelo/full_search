@@ -28,6 +28,70 @@ class FullSearch::SearchTest < ActiveSupport::TestCase
     assert_includes results.to_a, customer
   end
 
+  def test_full_search_finds_by_short_prefix
+    account = Account.create!(name: "Acme")
+    customer = @customer_model.create!(account_id: account.id, first_name: "Sarah")
+    FullSearch::Index.rebuild!(@customer_model)
+
+    results = @customer_model.full_search("sa", filters: { account_id: account.id })
+    assert_includes results.to_a, customer
+  end
+
+  def test_full_search_finds_by_short_prefix_with_porter
+    account = Account.create!(name: "Acme")
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name, weight: 5
+        field :last_name, weight: 5
+        filter :account_id, required: true
+        tokenize "porter"
+      end
+    end
+    model.table_name = "customers"
+    customer = model.create!(account_id: account.id, first_name: "Sarah")
+    FullSearch::Index.rebuild!(model)
+
+    results = model.full_search("sa", filters: { account_id: account.id })
+    assert_includes results.to_a, customer
+  end
+
+  def test_full_search_finds_by_short_prefix_with_trigram
+    account = Account.create!(name: "Acme")
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name, weight: 5
+        field :last_name, weight: 5
+        filter :account_id, required: true
+        typo_tolerance
+      end
+    end
+    model.table_name = "customers"
+    customer = model.create!(account_id: account.id, first_name: "Sarah")
+    FullSearch::Index.rebuild!(model)
+
+    results = model.full_search("sa", filters: { account_id: account.id })
+    assert_includes results.to_a, customer
+  end
+
+  def test_short_prefix_with_trigram_tokenizer_falls_back_to_like
+    account = Account.create!(name: "Acme")
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name, weight: 5
+        field :last_name, weight: 5
+        filter :account_id, required: true
+        tokenize "trigram"
+        typo_tolerance
+      end
+    end
+    model.table_name = "customers"
+    customer = model.create!(account_id: account.id, first_name: "Sarah")
+    FullSearch::Index.rebuild!(model)
+
+    results = model.full_search("sa", filters: { account_id: account.id })
+    assert_includes results.to_a, customer
+  end
+
   def test_missing_required_filter_raises
     assert_raises(FullSearch::MissingRequiredFilterError) do
       @customer_model.full_search("Sam", filters: {})

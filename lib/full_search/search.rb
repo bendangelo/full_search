@@ -82,7 +82,11 @@ module FullSearch
       return [] if match_expr.empty?
 
       term = parsed.last rescue nil
-      return [] if term.nil? || term.length < dsl.typo_tolerance_min_term_length.to_i
+      return [] if term.nil?
+
+      if term.length < dsl.typo_tolerance_min_term_length.to_i
+        return like_prefix_ids(term)
+      end
 
       trigram_table = FullSearch::Index.trigram_table_name(model)
 
@@ -95,6 +99,27 @@ module FullSearch
 
       filter_conditions = filters.map do |name, value|
         "AND #{trigram_table}.#{name} = #{connection.quote(value)}"
+      end.join(" ")
+
+      connection.execute("#{sql} #{filter_conditions}").map { |r| r["id"] }
+    end
+
+    def like_prefix_ids(term)
+      column_fields = dsl.fields.select { |f| f.source.nil? }
+      return [] if column_fields.empty?
+
+      like_conditions = column_fields.map do |field|
+        "#{connection.quote_table_name(model.table_name)}.#{connection.quote_column_name(field.name)} LIKE #{connection.quote("#{term}%")}"
+      end.join(" OR ")
+
+      sql = <<~SQL
+        SELECT #{model.table_name}.id
+        FROM #{model.table_name}
+        WHERE (#{like_conditions})
+      SQL
+
+      filter_conditions = filters.map do |name, value|
+        "AND #{model.table_name}.#{name} = #{connection.quote(value)}"
       end.join(" ")
 
       connection.execute("#{sql} #{filter_conditions}").map { |r| r["id"] }
