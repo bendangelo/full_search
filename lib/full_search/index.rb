@@ -18,7 +18,7 @@ module FullSearch
           conn.execute(create_virtual_table_sql(model))
         end
 
-        ensure_triggers!(model)
+        ensure_triggers!(model) if model_table_exists?(model)
         store_config_hash!(model)
       end
 
@@ -74,6 +74,12 @@ module FullSearch
 
       def q(value)
         connection.quote(value)
+      end
+
+      def model_table_exists?(model)
+        connection.execute(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name=#{q(model.table_name)} LIMIT 1"
+        ).any?
       end
 
       def table_exists?(model)
