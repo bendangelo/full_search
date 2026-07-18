@@ -46,8 +46,12 @@ module FullSearch
       end
     end
 
-    def tokenize(value)
-      @tokenize = Tokenizer.validate!(value)
+    def tokenize(value = :_no_arg_)
+      if value == :_no_arg_
+        @tokenize
+      else
+        @tokenize = Tokenizer.validate!(value)
+      end
     end
 
     def config_hash
