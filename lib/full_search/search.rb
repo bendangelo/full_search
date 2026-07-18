@@ -77,7 +77,7 @@ module FullSearch
       return [] if primary_ids.any?
       return [] unless bare_term?(parsed)
 
-      term = parsed.first[1]
+      term = parsed.last
       return [] if term.length < dsl.typo_tolerance_min_term_length.to_i
 
       trigram_table = FullSearch::Index.trigram_table_name(model)

@@ -18,6 +18,11 @@ module FullSearch
           conn.execute(create_virtual_table_sql(model))
         end
 
+        if dsl.typo_tolerance? && !trigram_table_exists?(model)
+          FullSearch::Typo.warn_unsupported! unless FullSearch::Typo.supported?
+          conn.execute(create_trigram_virtual_table_sql(model))
+        end
+
         ensure_triggers!(model) if model_table_exists?(model)
         store_config_hash!(model)
       end
@@ -34,8 +39,14 @@ module FullSearch
         with_rebuild_lock(model) do
           drop_triggers!(model)
           conn.execute("DROP TABLE IF EXISTS #{fts_table_name(model)};")
+          conn.execute("DROP TABLE IF EXISTS #{trigram_table_name(model)};")
           conn.execute(create_virtual_table_sql(model))
+          if dsl.typo_tolerance?
+            FullSearch::Typo.warn_unsupported! unless FullSearch::Typo.supported?
+            conn.execute(create_trigram_virtual_table_sql(model))
+          end
           conn.execute(backfill_sql(model))
+          conn.execute(backfill_trigram_sql(model)) if dsl.typo_tolerance?
           create_triggers!(model)
           optimize!(model)
           store_config_hash!(model, rebuilt_at: Time.current)
@@ -49,10 +60,15 @@ module FullSearch
       def drop!(model)
         drop_triggers!(model)
         connection.execute("DROP TABLE IF EXISTS #{fts_table_name(model)};")
+        connection.execute("DROP TABLE IF EXISTS #{trigram_table_name(model)};")
       end
 
       def fts_table_name(model)
         "#{model.table_name}_fts"
+      end
+
+      def trigram_table_name(model)
+        "#{fts_table_name(model)}_trigram"
       end
 
       def sqlite?
@@ -150,16 +166,26 @@ module FullSearch
         connection.execute(insert_trigger_sql(model))
         connection.execute(delete_trigger_sql(model))
         connection.execute(update_trigger_sql(model))
+        if model.full_search_dsl.typo_tolerance?
+          connection.execute(insert_trigram_trigger_sql(model))
+          connection.execute(delete_trigram_trigger_sql(model))
+          connection.execute(update_trigram_trigger_sql(model))
+        end
       end
 
       def drop_triggers!(model)
-        trigger_names(model).each do |name|
+        (trigger_names(model) + trigram_trigger_names(model)).each do |name|
           connection.execute("DROP TRIGGER IF EXISTS #{name};")
         end
       end
 
       def trigger_names(model)
         base = fts_table_name(model)
+        %W[#{base}_ai #{base}_ad #{base}_au]
+      end
+
+      def trigram_trigger_names(model)
+        base = trigram_table_name(model)
         %W[#{base}_ai #{base}_ad #{base}_au]
       end
 
@@ -198,6 +224,84 @@ module FullSearch
           BEGIN
             DELETE FROM #{fts_table} WHERE rowid = old.id;
             INSERT INTO #{fts_table}(rowid, #{cols_str})
+            VALUES (new.id, #{values});
+          END;
+        SQL
+      end
+
+      def trigram_table_exists?(model)
+        connection.execute(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name=#{q(trigram_table_name(model))} LIMIT 1"
+        ).any?
+      end
+
+      def create_trigram_virtual_table_sql(model)
+        dsl = model.full_search_dsl
+        columns = (dsl.fields + dsl.filters.map { |f| OpenStruct.new(name: f.name, unindexed?: true) })
+        column_list = columns.map { |c| c.respond_to?(:unindexed?) && c.unindexed? ? "#{c.name} UNINDEXED" : c.name }.join(", ")
+
+        <<~SQL
+          CREATE VIRTUAL TABLE #{trigram_table_name(model)} USING fts5(
+            #{column_list},
+            content='#{model.table_name}',
+            content_rowid='id',
+            tokenize='trigram'
+          );
+        SQL
+      end
+
+      def backfill_trigram_sql(model)
+        dsl = model.full_search_dsl
+        cols = (dsl.fields + dsl.filters)
+        select = cols.map do |c|
+          if c.respond_to?(:source) && c.source
+            source_value_sql(c.source)
+          else
+            "#{model.table_name}.#{c.name}"
+          end
+        end.join(", ")
+
+        <<~SQL
+          INSERT INTO #{trigram_table_name(model)}(rowid, #{cols.map(&:name).join(", ")})
+          SELECT #{model.table_name}.id, #{select} FROM #{model.table_name};
+        SQL
+      end
+
+      def insert_trigram_trigger_sql(model)
+        dsl = model.full_search_dsl
+        cols = dsl.fields + dsl.filters
+        values = cols.map { |c| column_ref(c, prefix: "new") }.join(", ")
+
+        <<~SQL
+          CREATE TRIGGER #{trigram_trigger_names(model).first} AFTER INSERT ON #{model.table_name} BEGIN
+            INSERT INTO #{trigram_table_name(model)}(rowid, #{col_names(cols)})
+            VALUES (new.id, #{values});
+          END;
+        SQL
+      end
+
+      def delete_trigram_trigger_sql(model)
+        <<~SQL
+          CREATE TRIGGER #{trigram_trigger_names(model)[1]} AFTER DELETE ON #{model.table_name} BEGIN
+            DELETE FROM #{trigram_table_name(model)} WHERE rowid = old.id;
+          END;
+        SQL
+      end
+
+      def update_trigram_trigger_sql(model)
+        dsl = model.full_search_dsl
+        cols = dsl.fields + dsl.filters
+        values = cols.map { |c| column_ref(c, prefix: "new") }.join(", ")
+        cols_str = col_names(cols)
+        trigram_table = trigram_table_name(model)
+
+        when_clause = SoftDelete.delete_transition_sql(model)
+
+        <<~SQL
+          CREATE TRIGGER #{trigram_trigger_names(model)[2]} AFTER UPDATE ON #{model.table_name} #{when_clause}
+          BEGIN
+            DELETE FROM #{trigram_table} WHERE rowid = old.id;
+            INSERT INTO #{trigram_table}(rowid, #{cols_str})
             VALUES (new.id, #{values});
           END;
         SQL
