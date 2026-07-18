@@ -1,6 +1,6 @@
 # full_search
 
-SQLite FTS5 full-text search for Rails/ActiveRecord. A lightweight, self-contained alternative to `meilisearch-rails` for apps already running on SQLite.
+SQLite FTS5 full-text search for Rails/ActiveRecord. A lightweight, self-contained alternative to `pg_search` for apps already running on SQLite.
 
 ## Installation
 
@@ -43,7 +43,7 @@ Customer.full_search("sam", filters: { account_id: 1 }).page(params[:page])
 - Automatic table creation and schema-drift detection
 - Rake tasks: `full_search:rebuild`, `full_search:optimize`, `full_search:status`
 
-## Known limitations vs. Meilisearch
+## Known limitations
 
 - No highlighting support (v1)
 - No phrase/exclusion/OR query operators (v1)

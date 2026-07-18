@@ -8,11 +8,11 @@ module FullSearch
       source_fields = dsl.fields.select(&:source)
       return if source_fields.empty?
 
-      model.after_save_commit do
+      model.after_save do
         FullSearch::Callbacks.reindex_record!(self)
       end
 
-      model.after_destroy_commit do
+      model.after_destroy do
         FullSearch::Callbacks.remove_record!(self)
       end
 
@@ -20,10 +20,10 @@ module FullSearch
         next unless field.reindex_on
 
         assoc_class = associated_class(model, field.reindex_on)
-        assoc_class&.after_save_commit do |record|
+        assoc_class&.after_save do |record|
           FullSearch::Callbacks.reindex_dependents!(record, model, field)
         end
-        assoc_class&.after_destroy_commit do |record|
+        assoc_class&.after_destroy do |record|
           FullSearch::Callbacks.reindex_dependents!(record, model, field)
         end
       end

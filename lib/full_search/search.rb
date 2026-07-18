@@ -45,7 +45,7 @@ module FullSearch
     end
 
     def fts_match_ids
-      return [] if query.length < 3
+      return [] if query.empty?
 
       terms = query.split.map { |t| %("#{t.gsub('"', '""')}"*) }.join(" AND ")
       sql = <<~SQL

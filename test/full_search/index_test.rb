@@ -15,6 +15,10 @@ class FullSearch::IndexTest < ActiveSupport::TestCase
     FullSearch::Index.drop!(@model) rescue nil
   end
 
+  def teardown
+    Customer.delete_all
+  end
+
   def test_ensure_table_creates_virtual_table
     FullSearch::Index.ensure_table!(@model)
     assert FullSearch::Index.send(:table_exists?, @model)

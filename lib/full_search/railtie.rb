@@ -5,7 +5,7 @@ require "rails"
 module FullSearch
   class Railtie < Rails::Railtie
     rake_tasks do
-      load File.expand_path("../../tasks/full_search.rake", __dir__)
+      load File.expand_path("../tasks/full_search.rake", __dir__)
     end
 
     initializer "full_search.ensure_tables" do
