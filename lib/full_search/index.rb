@@ -26,6 +26,7 @@ module FullSearch
         return unless FullSearch::Index.sqlite?
 
         dsl = model.full_search_dsl
+        return unless dsl
         conn = connection
 
         create_metadata_table!
@@ -181,30 +182,19 @@ module FullSearch
         dsl = model.full_search_dsl
         cols = dsl.fields + dsl.filters
         values = cols.map { |c| column_ref(c, prefix: "new") }.join(", ")
+        cols_str = col_names(cols)
+        fts_table = fts_table_name(model)
 
-        sql = <<~SQL
-          CREATE TRIGGER #{trigger_names(model).last} AFTER UPDATE ON #{model.table_name} BEGIN
-            DELETE FROM #{fts_table_name(model)} WHERE rowid = old.id;
+        when_clause = SoftDelete.delete_transition_sql(model)
+
+        <<~SQL
+          CREATE TRIGGER #{trigger_names(model)[2]} AFTER UPDATE ON #{model.table_name} #{when_clause}
+          BEGIN
+            DELETE FROM #{fts_table} WHERE rowid = old.id;
+            INSERT INTO #{fts_table}(rowid, #{cols_str})
+            VALUES (new.id, #{values});
+          END;
         SQL
-
-        if dsl.soft_delete_column
-          sql += <<~SQL
-              IF new.#{dsl.soft_delete_column} IS NOT NULL THEN
-                DELETE FROM #{fts_table_name(model)} WHERE rowid = new.id;
-              ELSE
-                INSERT INTO #{fts_table_name(model)}(rowid, #{col_names(cols)})
-                VALUES (new.id, #{values});
-              END IF;
-          SQL
-        else
-          sql += <<~SQL
-              INSERT INTO #{fts_table_name(model)}(rowid, #{col_names(cols)})
-              VALUES (new.id, #{values});
-          SQL
-        end
-
-        sql += "END;"
-        sql
       end
 
       def col_names(cols)

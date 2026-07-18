@@ -13,6 +13,7 @@ require "full_search/model"
 require "full_search/index"
 require "full_search/exact_match"
 require "full_search/search"
+require "full_search/soft_delete"
 
 ActiveSupport.on_load(:active_record) do
   include FullSearch::Model
