@@ -50,13 +50,13 @@ module FullSearch
     def self.manual_snippets(records, model, query)
       dsl = model.full_search_dsl
       config = dsl.highlight_config || { open_tag: "<mark>", close_tag: "</mark>" }
-      cols = dsl.fields.map(&:name)
+        cols = dsl.fields.map(&:name)
 
-      records.to_h do |record|
-        text = cols.map { |col| record.public_send(col).to_s }.join(" ").strip
-        highlighted = manual_highlight(text, query, config)
-        [record.id, highlighted.presence]
-      end
+        records.to_h do |record|
+          text = cols.map { |col| record.full_search_text_for(col).to_s }.join(" ").strip
+          highlighted = manual_highlight(text, query, config)
+          [record.id, highlighted.presence]
+        end
     end
 
     def self.manual_field_snippets(records, model, query)
@@ -66,7 +66,7 @@ module FullSearch
 
       records.to_h do |record|
         snippets = cols.each_with_object({}) do |col, hash|
-          value = record.public_send(col).to_s
+          value = record.full_search_text_for(col).to_s
           highlighted = manual_highlight(value, query, config)
           hash[col.to_s] = highlighted if highlighted.include?(config[:open_tag])
         end
