@@ -14,6 +14,8 @@ require "full_search/index"
 require "full_search/exact_match"
 require "full_search/search"
 require "full_search/soft_delete"
+require "full_search/callbacks"
+require "full_search/reindex_job"
 
 ActiveSupport.on_load(:active_record) do
   include FullSearch::Model
