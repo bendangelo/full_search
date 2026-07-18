@@ -28,3 +28,5 @@ module FullSearch
     end
   end
 end
+
+require "full_search/railtie" if defined?(Rails::Railtie)
