@@ -4,12 +4,18 @@ module FullSearch
   class Highlighter
     def self.apply!(records, model, query)
       snippets = build_snippets(model, query)
+      if snippets.values.all?(&:nil?) && records.any?
+        snippets = manual_snippets(records, model, query)
+      end
       records.each { |record| record.full_search_snippet = snippets[record.id] }
       records
     end
 
     def self.apply_fields!(records, model, query)
       fields = build_field_snippets(model, query)
+      if fields.empty? && records.any?
+        fields = manual_field_snippets(records, model, query)
+      end
       records.each { |record| record.full_search_highlight_fields = fields[record.id] || {} }
       records
     end
@@ -39,6 +45,38 @@ module FullSearch
         end
         [row["rowid"], snippets]
       end
+    end
+
+    def self.manual_snippets(records, model, query)
+      dsl = model.full_search_dsl
+      config = dsl.highlight_config || { open_tag: "<mark>", close_tag: "</mark>" }
+      cols = dsl.fields.map(&:name)
+
+      records.to_h do |record|
+        text = cols.map { |col| record.public_send(col).to_s }.join(" ").strip
+        highlighted = manual_highlight(text, query, config)
+        [record.id, highlighted.presence]
+      end
+    end
+
+    def self.manual_field_snippets(records, model, query)
+      dsl = model.full_search_dsl
+      config = dsl.highlight_config || { open_tag: "<mark>", close_tag: "</mark>" }
+      cols = dsl.fields.map(&:name)
+
+      records.to_h do |record|
+        snippets = cols.each_with_object({}) do |col, hash|
+          value = record.public_send(col).to_s
+          highlighted = manual_highlight(value, query, config)
+          hash[col.to_s] = highlighted if highlighted.include?(config[:open_tag])
+        end
+        [record.id, snippets]
+      end
+    end
+
+    def self.manual_highlight(text, query, config)
+      return text if text.empty? || query.empty?
+      text.gsub(/#{Regexp.escape(query)}/i, "#{config[:open_tag]}\\0#{config[:close_tag]}")
     end
 
     def self.highlight_rows(model, query)
