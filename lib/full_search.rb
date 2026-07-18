@@ -16,6 +16,7 @@ require "full_search/search"
 require "full_search/soft_delete"
 require "full_search/callbacks"
 require "full_search/reindex_job"
+require "full_search/test_helpers"
 
 ActiveSupport.on_load(:active_record) do
   include FullSearch::Model
