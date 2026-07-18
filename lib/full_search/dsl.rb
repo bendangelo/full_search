@@ -2,7 +2,7 @@
 
 module FullSearch
   class Dsl
-    attr_reader :fields, :exact_matches, :filters, :model_class, :tokenize
+    attr_reader :fields, :exact_matches, :filters, :model_class, :tokenize, :highlight_config
 
     Field = Data.define(:name, :weight, :source, :reindex_on, :async)
     ExactMatch = Data.define(:name, :source)
@@ -54,12 +54,31 @@ module FullSearch
       end
     end
 
+    def highlight(open_tag: "<mark>", close_tag: "</mark>")
+      @highlight_config = { open_tag: open_tag, close_tag: close_tag }
+    end
+
+    def typo_tolerance(enabled = true, min_term_length: nil)
+      @typo_tolerance = enabled
+      @typo_tolerance_min_term_length = min_term_length || 3
+    end
+
+    def typo_tolerance?
+      !!@typo_tolerance
+    end
+
+    def typo_tolerance_min_term_length
+      @typo_tolerance_min_term_length || 3
+    end
+
     def config_hash
       require "digest"
       Digest::SHA256.hexdigest([
         model_class.table_name,
         tokenize,
         soft_delete_column,
+        typo_tolerance?,
+        typo_tolerance_min_term_length,
         fields.map { |f| [f.name, f.weight, f.source.nil? ? "column" : "source", f.reindex_on, f.async] },
         exact_matches.map { |e| [e.name] },
         filters.map { |f| [f.name, f.required] }

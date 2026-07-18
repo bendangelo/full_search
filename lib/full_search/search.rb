@@ -2,24 +2,27 @@
 
 module FullSearch
   class Search
-    attr_reader :model, :query, :filters, :include_soft_deleted, :limit, :offset
+    attr_reader :model, :query, :filters, :include_soft_deleted, :limit, :offset, :highlight
 
-    def initialize(model, query, filters:, include_soft_deleted:, limit:, offset:)
+    def initialize(model, query, filters:, include_soft_deleted:, limit:, offset:, highlight: false)
       @model = model
       @query = query.to_s.strip
       @filters = filters
       @include_soft_deleted = include_soft_deleted
       @limit = limit
       @offset = offset
+      @highlight = highlight
     end
 
     def relation
       validate_required_filters!
 
+      parsed = QueryParser.parse(query)
       exact_ids = ExactMatch.ids_for(model, query, filters)
-      fts_ids = fts_match_ids
+      primary_ids = fts_match_ids(parsed)
+      fallback_ids = dsl.typo_tolerance? ? trigram_match_ids(parsed, primary_ids) : []
 
-      all_ids = (exact_ids + fts_ids).uniq
+      all_ids = (exact_ids + primary_ids + fallback_ids).uniq
       return model.none if all_ids.empty?
 
       rel = model.where(id: all_ids)
@@ -28,7 +31,13 @@ module FullSearch
       rel = rel.offset(offset) if offset
 
       order_sql = case_clause(all_ids)
-      rel.order(Arel.sql(order_sql))
+      rel = rel.order(Arel.sql(order_sql))
+
+      if highlight
+        Highlighter.apply!(rel.to_a, model, query)
+      else
+        rel
+      end
     end
 
     private
@@ -44,22 +53,51 @@ module FullSearch
       end
     end
 
-    def fts_match_ids
+    def fts_match_ids(parsed)
       return [] if query.empty?
 
-      terms = query.split.map { |t| %("#{t.gsub('"', '""')}"*) }.join(" AND ")
+      match_expr = QueryParser.to_match_expression(parsed)
+      fts_table = FullSearch::Index.fts_table_name(model)
+
       sql = <<~SQL
         SELECT #{model.table_name}.id
-        FROM #{FullSearch::Index.fts_table_name(model)}
-        JOIN #{model.table_name} ON #{model.table_name}.id = #{FullSearch::Index.fts_table_name(model)}.rowid
-        WHERE #{FullSearch::Index.fts_table_name(model)} MATCH #{connection.quote(terms)}
+        FROM #{fts_table}
+        JOIN #{model.table_name} ON #{model.table_name}.id = #{fts_table}.rowid
+        WHERE #{fts_table} MATCH #{connection.quote(match_expr)}
       SQL
 
       filter_conditions = filters.map do |name, value|
-        "AND #{FullSearch::Index.fts_table_name(model)}.#{name} = #{connection.quote(value)}"
+        "AND #{fts_table}.#{name} = #{connection.quote(value)}"
       end.join(" ")
 
       connection.execute("#{sql} #{filter_conditions}").map { |r| r["id"] }
+    end
+
+    def trigram_match_ids(parsed, primary_ids)
+      return [] if primary_ids.any?
+      return [] unless bare_term?(parsed)
+
+      term = parsed.first[1]
+      return [] if term.length < dsl.typo_tolerance_min_term_length.to_i
+
+      trigram_table = FullSearch::Index.trigram_table_name(model)
+
+      sql = <<~SQL
+        SELECT #{model.table_name}.id
+        FROM #{trigram_table}
+        JOIN #{model.table_name} ON #{model.table_name}.id = #{trigram_table}.rowid
+        WHERE #{trigram_table} MATCH #{connection.quote(term)}
+      SQL
+
+      filter_conditions = filters.map do |name, value|
+        "AND #{trigram_table}.#{name} = #{connection.quote(value)}"
+      end.join(" ")
+
+      connection.execute("#{sql} #{filter_conditions}").map { |r| r["id"] }
+    end
+
+    def bare_term?(parsed)
+      parsed.is_a?(Array) && parsed.size == 2 && parsed.first == :term
     end
 
     def case_clause(ids)
