@@ -9,7 +9,16 @@ require "full_search/config"
 require "full_search/errors"
 require "full_search/tokenizer"
 require "full_search/dsl"
+require "full_search/model"
+
+ActiveSupport.on_load(:active_record) do
+  include FullSearch::Model
+end
 
 module FullSearch
-  # loaded in later tasks
+  class << self
+    def models
+      @models ||= []
+    end
+  end
 end
