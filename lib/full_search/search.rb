@@ -2,9 +2,9 @@
 
 module FullSearch
   class Search
-    attr_reader :model, :query, :filters, :include_soft_deleted, :limit, :offset, :highlight
+    attr_reader :model, :query, :filters, :include_soft_deleted, :limit, :offset, :highlight, :highlight_fields
 
-    def initialize(model, query, filters:, include_soft_deleted:, limit:, offset:, highlight: false)
+    def initialize(model, query, filters:, include_soft_deleted:, limit:, offset:, highlight: false, highlight_fields: false)
       @model = model
       @query = query.to_s.strip
       @filters = filters
@@ -12,6 +12,7 @@ module FullSearch
       @limit = limit
       @offset = offset
       @highlight = highlight
+      @highlight_fields = highlight_fields
     end
 
     def relation
@@ -30,11 +31,12 @@ module FullSearch
       rel = rel.limit(limit) if limit
       rel = rel.offset(offset) if offset
 
-      order_sql = case_clause(all_ids)
-      rel = rel.order(Arel.sql(order_sql))
+      rel = apply_ranking(rel, all_ids, exact_ids)
 
       if highlight
         Highlighter.apply!(rel.to_a, model, query)
+      elsif highlight_fields
+        Highlighter.apply_fields!(rel.to_a, model, query)
       else
         rel
       end
@@ -98,12 +100,36 @@ module FullSearch
       connection.execute("#{sql} #{filter_conditions}").map { |r| r["id"] }
     end
 
-    def bare_term?(parsed)
-      parsed.is_a?(Array) && parsed.size == 2 && parsed.first == :term
-    end
+    def apply_ranking(rel, all_ids, exact_ids)
+      return rel if all_ids.empty?
 
-    def case_clause(ids)
-      "CASE id #{ids.map.with_index { |id, i| "WHEN #{id} THEN #{i}" }.join(" ")} END"
+      order_parts = []
+
+      if exact_ids.any?
+        order_parts << "CASE #{model.table_name}.id #{exact_ids.map { |id| "WHEN #{id} THEN 0" }.join(" ")} ELSE 1 END"
+      end
+
+      fts_table = FullSearch::Index.fts_table_name(model)
+      match_expr = QueryParser.to_match_expression(QueryParser.parse(query))
+
+      rank_subquery = <<~SQL
+        SELECT rowid, rank
+        FROM #{fts_table}
+        WHERE #{fts_table} MATCH #{connection.quote(match_expr)}
+      SQL
+
+      rel = rel
+        .select("#{model.table_name}.*, fts_rank.rank AS full_search_rank")
+        .joins("LEFT JOIN (#{rank_subquery}) AS fts_rank ON fts_rank.rowid = #{model.table_name}.id")
+
+      order_parts << "COALESCE(fts_rank.rank, 1)"
+
+      dsl.rank_bys.each do |rank_by|
+        col = "#{connection.quote_table_name(model.table_name)}.#{connection.quote_column_name(rank_by.column)}"
+        order_parts << "#{col} #{rank_by.direction.to_s.upcase} NULLS LAST"
+      end
+
+      rel.order(Arel.sql(order_parts.join(", ")))
     end
 
     def connection

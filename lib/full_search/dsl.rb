@@ -2,17 +2,19 @@
 
 module FullSearch
   class Dsl
-    attr_reader :fields, :exact_matches, :filters, :model_class, :tokenize, :highlight_config
+    attr_reader :fields, :exact_matches, :filters, :model_class, :tokenize, :highlight_config, :rank_bys
 
     Field = Data.define(:name, :weight, :source, :reindex_on, :async)
     ExactMatch = Data.define(:name, :source)
     Filter = Data.define(:name, :required)
+    RankBy = Data.define(:column, :direction)
 
     def initialize(model_class)
       @model_class = model_class
       @fields = []
       @exact_matches = []
       @filters = []
+      @rank_bys = []
       @tokenize = FullSearch.config.default_tokenizer
       @soft_delete_column = nil
     end
@@ -29,6 +31,13 @@ module FullSearch
         raise InvalidFieldError, "Invalid exact_match name: #{name.inspect}"
       end
       @exact_matches << ExactMatch.new(name: name.to_s, source: source)
+    end
+
+    def rank_by(column, direction = :desc)
+      unless valid_name?(column)
+        raise InvalidFieldError, "Invalid rank_by column: #{column.inspect}"
+      end
+      @rank_bys << RankBy.new(column: column.to_s, direction: direction.to_sym)
     end
 
     def filter(name, required: false)
@@ -81,7 +90,8 @@ module FullSearch
         typo_tolerance_min_term_length,
         fields.map { |f| [f.name, f.weight, f.source.nil? ? "column" : "source", f.reindex_on, f.async] },
         exact_matches.map { |e| [e.name] },
-        filters.map { |f| [f.name, f.required] }
+        filters.map { |f| [f.name, f.required] },
+        rank_bys.map { |r| [r.column, r.direction] }
       ].inspect)
     end
 

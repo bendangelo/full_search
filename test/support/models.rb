@@ -13,6 +13,7 @@ ActiveRecord::Schema.define do
     t.string :fleet_identifier
     t.integer :customer_type, default: 0
     t.datetime :discarded_at
+    t.timestamps
   end
 
   create_table :vehicles, force: true do |t|
