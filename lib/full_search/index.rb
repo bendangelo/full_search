@@ -243,8 +243,6 @@ module FullSearch
         <<~SQL
           CREATE VIRTUAL TABLE #{trigram_table_name(model)} USING fts5(
             #{column_list},
-            content='#{model.table_name}',
-            content_rowid='id',
             tokenize='trigram'
           );
         SQL

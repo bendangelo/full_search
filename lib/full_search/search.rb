@@ -75,10 +75,12 @@ module FullSearch
 
     def trigram_match_ids(parsed, primary_ids)
       return [] if primary_ids.any?
-      return [] unless bare_term?(parsed)
 
-      term = parsed.last
-      return [] if term.length < dsl.typo_tolerance_min_term_length.to_i
+      match_expr = QueryParser.to_match_expression(parsed)
+      return [] if match_expr.empty?
+
+      term = parsed.last rescue nil
+      return [] if term.nil? || term.length < dsl.typo_tolerance_min_term_length.to_i
 
       trigram_table = FullSearch::Index.trigram_table_name(model)
 
@@ -86,7 +88,7 @@ module FullSearch
         SELECT #{model.table_name}.id
         FROM #{trigram_table}
         JOIN #{model.table_name} ON #{model.table_name}.id = #{trigram_table}.rowid
-        WHERE #{trigram_table} MATCH #{connection.quote(term)}
+        WHERE #{trigram_table} MATCH #{connection.quote(match_expr)}
       SQL
 
       filter_conditions = filters.map do |name, value|

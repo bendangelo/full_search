@@ -25,7 +25,7 @@ module FullSearch
       type, value = parsed
       case type
       when :and
-        value.size == 1 ? node_to_match(value.first) : "(#{value.map { |n| node_to_match(n) }.join(' AND ')})"
+        build_and_expression(value)
       when :or
         value.map { |sub| to_match_expression(sub) }.join(" OR ")
       else
@@ -35,6 +35,21 @@ module FullSearch
 
     private
 
+    def self.build_and_expression(nodes)
+      non_excludes = nodes.reject { |n| n.first == :exclude }
+      excludes = nodes.select { |n| n.first == :exclude }
+
+      parts = non_excludes.map { |n| node_to_match(n) }
+      result = parts.size == 1 ? parts.first : "(#{parts.join(' AND ')})"
+
+      excludes.each do |node|
+        _, value = node
+        result = "#{result} NOT \"#{escape(value)}\""
+      end
+
+      result
+    end
+
     def self.node_to_match(node)
       type, value = node
       case type
@@ -43,7 +58,7 @@ module FullSearch
       when :phrase
         '"' + escape(value) + '"'
       when :exclude
-        '-"' + escape(value) + '"'
+        nil
       end
     end
 
