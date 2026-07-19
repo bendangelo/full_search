@@ -2,15 +2,16 @@
 
 module FullSearch
   class Config
-    attr_accessor :auto_manage_schema, :stale_query_behavior, :lock_rebuilds, :default_async_reindex, :default_tokenizer
+    attr_accessor :auto_rebuild_schema, :stale_query_behavior, :lock_rebuilds, :default_async_reindex, :default_tokenizer
 
     def initialize
-      @auto_manage_schema = false
+      @auto_rebuild_schema = false
       @stale_query_behavior = :raise
       @lock_rebuilds = true
       @default_async_reindex = true
       @default_tokenizer = "unicode61"
     end
+
   end
 
   class << self

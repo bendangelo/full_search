@@ -10,16 +10,10 @@ module FullSearch
 
     initializer "full_search.ensure_tables" do
       config.after_initialize do
-        next unless FullSearch.config.auto_manage_schema
+        next unless FullSearch.config.auto_rebuild_schema
         ActiveSupport.on_load(:active_record) do
           FullSearch.models.each do |model|
-            FullSearch::Index.ensure_table!(model)
-            next unless FullSearch.config.auto_manage_schema == true
-
-            stored = FullSearch::Index.stored_config_hash(model)
-            if stored && stored != model.full_search_dsl.config_hash
-              FullSearch::Index.rebuild!(model)
-            end
+            FullSearch::Index.rebuild_if_needed!(model)
           end
         end
       end

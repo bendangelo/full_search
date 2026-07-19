@@ -27,6 +27,18 @@ module FullSearch
       def full_search_ids(query, filters: {}, include_soft_deleted: false, limit: 1000)
         full_search(query, filters: filters, include_soft_deleted: include_soft_deleted, limit: limit).pluck(:id)
       end
+
+      def rebuild!
+        FullSearch::Index.rebuild!(self)
+      end
+
+      def optimize!
+        FullSearch::Index.optimize!(self)
+      end
+
+      def reindex!
+        FullSearch::Index.reindex_source_fields!(self)
+      end
     end
 
     included do |base|

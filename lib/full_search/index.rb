@@ -30,10 +30,10 @@ module FullSearch
           conn.execute(backfill_sql(model))
           conn.execute(backfill_trigram_sql(model)) if dsl.typo_tolerance?
           reindex_source_fields!(model) if dsl.fields.any?(&:source)
+          store_config_hash!(model)
         end
 
         ensure_triggers!(model) if model_table_exists?(model)
-        store_config_hash!(model)
       end
 
       def rebuild!(model)
@@ -60,6 +60,24 @@ module FullSearch
           create_triggers!(model)
           optimize!(model)
           store_config_hash!(model, rebuilt_at: Time.current)
+        end
+      end
+
+      def rebuild_if_needed!(model)
+        return false unless FullSearch::Index.sqlite?
+
+        dsl = model.full_search_dsl
+        return false unless dsl
+
+        create_metadata_table!
+        ensure_table!(model)
+
+        stored = stored_config_hash(model)
+        if stored && stored == dsl.config_hash
+          false
+        else
+          rebuild!(model)
+          true
         end
       end
 

@@ -1,30 +1,45 @@
 # frozen_string_literal: true
 
+def resolve_full_search_models(args)
+  if args[:models]
+    args[:models].split(",").map do |name|
+      klass = name.singularize.camelize.constantize rescue nil
+      klass || FullSearch.models.find { |m| m.table_name == name }
+    end.compact
+  else
+    FullSearch.models
+  end
+end
+
 namespace :full_search do
-  desc "Rebuild full_search indexes"
+  desc "Rebuild indexes when DSL has changed (checks config hash; safe for production)"
   task :rebuild, [:models] => :environment do |_t, args|
     Rails.application.eager_load!
 
-    models = if args[:models]
-               args[:models].split(",").map do |name|
-                 klass = name.singularize.camelize.constantize rescue nil
-                 klass || FullSearch.models.find { |m| m.table_name == name }
-               end.compact
-             else
-               FullSearch.models
-             end
+    resolve_full_search_models(args).each do |model|
+      if FullSearch::Index.rebuild_if_needed!(model)
+        puts "Rebuilt #{FullSearch::Index.fts_table_name(model)}"
+      else
+        puts "#{FullSearch::Index.fts_table_name(model)} is current"
+      end
+    end
+  end
 
-    models.each do |model|
+  desc "Force reset indexes (drops and recreates all FTS tables)"
+  task :reset, [:models] => :environment do |_t, args|
+    Rails.application.eager_load!
+
+    resolve_full_search_models(args).each do |model|
       FullSearch::Index.rebuild!(model)
-      puts "Rebuilt #{FullSearch::Index.fts_table_name(model)}"
+      puts "Reset #{FullSearch::Index.fts_table_name(model)}"
     end
   end
 
   desc "Optimize full_search indexes"
   task optimize: :environment do
     Rails.application.eager_load!
+    FullSearch.optimize!
     FullSearch.models.each do |model|
-      FullSearch::Index.optimize!(model)
       puts "Optimized #{FullSearch::Index.fts_table_name(model)}"
     end
   end

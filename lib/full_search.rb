@@ -19,6 +19,7 @@ require "full_search/search"
 require "full_search/soft_delete"
 require "full_search/callbacks"
 require "full_search/reindex_job"
+require "full_search/optimize_job"
 require "full_search/test_helpers"
 require "full_search/multi_search"
 
@@ -30,6 +31,10 @@ module FullSearch
   class << self
     def models
       @models ||= []
+    end
+
+    def optimize!
+      models.each { |model| Index.optimize!(model) }
     end
   end
 end
