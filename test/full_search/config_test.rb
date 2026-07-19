@@ -25,6 +25,10 @@ class FullSearch::ConfigTest < ActiveSupport::TestCase
     assert_equal "porter", FullSearch.config.default_tokenizer
   end
 
+  def test_auto_rebuild_on_stale_query_defaults_to_false
+    assert_equal false, FullSearch.config.auto_rebuild_on_stale_query
+  end
+
   def test_auto_rebuild_schema_deprecation_backward_compat
     FullSearch.config.auto_rebuild_schema = true
     assert_equal true, FullSearch.config.auto_rebuild_schema
