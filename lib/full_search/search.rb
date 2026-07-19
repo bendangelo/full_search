@@ -65,17 +65,18 @@ module FullSearch
       return [] if query.empty?
 
       match_expr = QueryParser.to_match_expression(parsed)
-      fts_table = FullSearch::Index.fts_table_name(model)
+      fts_table = qt(FullSearch::Index.fts_table_name(model))
+      tbl = qt(model.table_name)
 
       sql = <<~SQL
-        SELECT #{model.table_name}.id
+        SELECT #{tbl}.id
         FROM #{fts_table}
-        JOIN #{model.table_name} ON #{model.table_name}.id = #{fts_table}.rowid
-        WHERE #{fts_table} MATCH #{connection.quote(match_expr)}
+        JOIN #{tbl} ON #{tbl}.id = #{fts_table}.rowid
+        WHERE #{fts_table} MATCH #{q(match_expr)}
       SQL
 
       filter_conditions = filters.map do |name, value|
-        "AND #{fts_table}.#{name} = #{connection.quote(value)}"
+        "AND #{fts_table}.#{qc(name)} = #{q(value)}"
       end.join(" ")
 
       connection.execute("#{sql} #{filter_conditions}").map { |r| r["id"] }
@@ -98,17 +99,18 @@ module FullSearch
         return like_prefix_ids(term)
       end
 
-      trigram_table = FullSearch::Index.trigram_table_name(model)
+      trigram_table = qt(FullSearch::Index.trigram_table_name(model))
+      tbl = qt(model.table_name)
 
       sql = <<~SQL
-        SELECT #{model.table_name}.id
+        SELECT #{tbl}.id
         FROM #{trigram_table}
-        JOIN #{model.table_name} ON #{model.table_name}.id = #{trigram_table}.rowid
-        WHERE #{trigram_table} MATCH #{connection.quote(match_expr)}
+        JOIN #{tbl} ON #{tbl}.id = #{trigram_table}.rowid
+        WHERE #{trigram_table} MATCH #{q(match_expr)}
       SQL
 
       filter_conditions = filters.map do |name, value|
-        "AND #{trigram_table}.#{name} = #{connection.quote(value)}"
+        "AND #{trigram_table}.#{qc(name)} = #{q(value)}"
       end.join(" ")
 
       connection.execute("#{sql} #{filter_conditions}").map { |r| r["id"] }
@@ -117,26 +119,27 @@ module FullSearch
     def like_prefix_ids(term)
       column_fields = dsl.fields.select { |f| f.source.nil? }
       source_fields = dsl.fields.select { |f| f.source }
+      tbl = qt(model.table_name)
 
       soft_delete_clause = ""
       if dsl.soft_delete_column && !include_soft_deleted
-        soft_delete_clause = "AND #{model.table_name}.#{dsl.soft_delete_column} IS NULL"
+        soft_delete_clause = "AND #{tbl}.#{qc(dsl.soft_delete_column)} IS NULL"
       end
 
       ids = []
 
       if column_fields.any?
         like_conditions = column_fields.map do |field|
-          "#{connection.quote_table_name(model.table_name)}.#{connection.quote_column_name(field.name)} LIKE #{connection.quote("#{term}%")}"
+          "#{tbl}.#{qc(field.name)} LIKE #{q("#{term}%")}"
         end.join(" OR ")
 
         filter_conditions = filters.map do |name, value|
-          "AND #{model.table_name}.#{name} = #{connection.quote(value)}"
+          "AND #{tbl}.#{qc(name)} = #{q(value)}"
         end.join(" ")
 
         sql = <<~SQL
-          SELECT #{model.table_name}.id
-          FROM #{model.table_name}
+          SELECT #{tbl}.id
+          FROM #{tbl}
           WHERE (#{like_conditions}) #{filter_conditions} #{soft_delete_clause}
         SQL
 
@@ -145,19 +148,19 @@ module FullSearch
       end
 
       if source_fields.any?
-        fts_table = FullSearch::Index.fts_table_name(model)
+        fts_table = qt(FullSearch::Index.fts_table_name(model))
         like_conditions = source_fields.map do |field|
-          "#{fts_table}.#{field.name} LIKE #{connection.quote("#{term}%")}"
+          "#{fts_table}.#{qc(field.name)} LIKE #{q("#{term}%")}"
         end.join(" OR ")
 
         filter_conditions = filters.map do |name, value|
-          "AND #{fts_table}.#{name} = #{connection.quote(value)}"
+          "AND #{fts_table}.#{qc(name)} = #{q(value)}"
         end.join(" ")
 
         sql = <<~SQL
-          SELECT #{model.table_name}.id
+          SELECT #{tbl}.id
           FROM #{fts_table}
-          JOIN #{model.table_name} ON #{model.table_name}.id = #{fts_table}.rowid
+          JOIN #{tbl} ON #{tbl}.id = #{fts_table}.rowid
           WHERE (#{like_conditions}) #{filter_conditions} #{soft_delete_clause}
         SQL
 
@@ -185,23 +188,24 @@ module FullSearch
       return [] if column_fields.empty?
 
       register_levenshtein!
+      tbl = qt(model.table_name)
 
       soft_delete_clause = ""
       if dsl.soft_delete_column && !include_soft_deleted
-        soft_delete_clause = "AND #{model.table_name}.#{dsl.soft_delete_column} IS NULL"
+        soft_delete_clause = "AND #{tbl}.#{qc(dsl.soft_delete_column)} IS NULL"
       end
 
       filter_conditions = filters.map do |name, value|
-        "AND #{model.table_name}.#{name} = #{connection.quote(value)}"
+        "AND #{tbl}.#{qc(name)} = #{q(value)}"
       end.join(" ")
 
       conditions = column_fields.map do |field|
-        "levenshtein(LOWER(#{connection.quote_table_name(model.table_name)}.#{connection.quote_column_name(field.name)}), #{connection.quote(term_str.downcase)}) <= #{max_typos}"
+        "levenshtein(LOWER(#{tbl}.#{qc(field.name)}), #{q(term_str.downcase)}) <= #{max_typos}"
       end.join(" OR ")
 
       sql = <<~SQL
-        SELECT #{model.table_name}.id
-        FROM #{model.table_name}
+        SELECT #{tbl}.id
+        FROM #{tbl}
         WHERE (#{conditions}) #{filter_conditions} #{soft_delete_clause}
       SQL
 
@@ -262,28 +266,29 @@ module FullSearch
       return rel if all_ids.empty?
 
       order_parts = []
+      tbl = qt(model.table_name)
 
       if exact_ids.any?
-        order_parts << "CASE #{model.table_name}.id #{exact_ids.map { |id| "WHEN #{id} THEN 0" }.join(" ")} ELSE 1 END"
+        order_parts << "CASE #{tbl}.id #{exact_ids.map { |id| "WHEN #{q(id)} THEN 0" }.join(" ")} ELSE 1 END"
       end
 
-      fts_table = FullSearch::Index.fts_table_name(model)
+      fts_table = qt(FullSearch::Index.fts_table_name(model))
       match_expr = QueryParser.to_match_expression(QueryParser.parse(query))
 
       rank_subquery = <<~SQL
         SELECT rowid, rank
         FROM #{fts_table}
-        WHERE #{fts_table} MATCH #{connection.quote(match_expr)}
+        WHERE #{fts_table} MATCH #{q(match_expr)}
       SQL
 
       rel = rel
-        .select("#{model.table_name}.*, fts_rank.rank AS full_search_rank")
-        .joins("LEFT JOIN (#{rank_subquery}) AS fts_rank ON fts_rank.rowid = #{model.table_name}.id")
+        .select("#{tbl}.*, fts_rank.rank AS full_search_rank")
+        .joins("LEFT JOIN (#{rank_subquery}) AS fts_rank ON fts_rank.rowid = #{tbl}.id")
 
       order_parts << "COALESCE(fts_rank.rank, 1)"
 
       dsl.rank_bys.each do |rank_by|
-        col = "#{connection.quote_table_name(model.table_name)}.#{connection.quote_column_name(rank_by.column)}"
+        col = "#{tbl}.#{qc(rank_by.column)}"
         order_parts << "#{col} #{rank_by.direction.to_s.upcase} NULLS LAST"
       end
 
@@ -291,7 +296,21 @@ module FullSearch
     end
 
     def connection
+      model.connection
+    rescue
       ActiveRecord::Base.connection
+    end
+
+    def q(value)
+      connection.quote(value)
+    end
+
+    def qt(name)
+      connection.quote_table_name(name)
+    end
+
+    def qc(name)
+      connection.quote_column_name(name)
     end
   end
 end

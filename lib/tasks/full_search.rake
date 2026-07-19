@@ -58,10 +58,13 @@ namespace :full_search do
       source_fields = model.full_search_dsl.fields.select(&:source).map(&:name)
 
       drift_info = if source_fields.any?
+        conn = ActiveRecord::Base.connection
+        qc = ->(name) { conn.quote_column_name(name) }
+        qt = ->(name) { conn.quote_table_name(name) }
         empty_count = ActiveRecord::Base.connection.execute(<<~SQL).first["c"]
           SELECT COUNT(*) AS c
-          FROM #{FullSearch::Index.fts_table_name(model)}
-          WHERE #{source_fields.map { |c| "#{c} = ''" }.join(" OR ")}
+          FROM #{qt.call(FullSearch::Index.fts_table_name(model))}
+          WHERE #{source_fields.map { |c| "#{qc.call(c)} = ''" }.join(" OR ")}
         SQL
         " | empty source fields: #{empty_count}"
       else

@@ -45,9 +45,13 @@ module FullSearch
       unless valid_name?(column)
         raise InvalidFieldError, "Invalid rank_by column: #{column.inspect}"
       end
+      dir = direction.to_s.downcase
+      unless %w[asc desc].include?(dir)
+        raise InvalidFieldError, "Invalid rank_by direction: #{direction.inspect}. Use :asc or :desc."
+      end
       str = column.to_s
       raise InvalidFieldError, "Duplicate rank_by column: #{column.inspect}" if rank_bys.any? { |r| r.column == str }
-      @rank_bys << RankBy.new(column: str, direction: direction.to_sym)
+      @rank_bys << RankBy.new(column: str, direction: dir.to_sym)
     end
 
     def filter(name, required: false)

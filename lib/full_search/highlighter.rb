@@ -181,18 +181,18 @@ module FullSearch
         match_expr = QueryParser.to_match_expression(QueryParser.parse(query))
         return [] if match_expr.empty?
 
-        table = FullSearch::Index.fts_table_name(model)
+        table = qt(FullSearch::Index.fts_table_name(model))
         cols = dsl.fields.map(&:name)
         return [] if cols.empty?
 
         highlight_parts = cols.each_with_index.map do |col, idx|
-          "highlight(#{table}, #{idx}, #{quote(config[:open_tag])}, #{quote(config[:close_tag])}) AS #{col}_snippet"
+          "highlight(#{table}, #{idx}, #{q(config[:open_tag])}, #{q(config[:close_tag])}) AS #{qc("#{col}_snippet")}"
         end.join(", ")
 
         sql = <<~SQL
           SELECT rowid, #{highlight_parts}
           FROM #{table}
-          WHERE #{table} MATCH #{quote(match_expr)}
+          WHERE #{table} MATCH #{q(match_expr)}
         SQL
 
         connection.execute(sql)
@@ -202,8 +202,16 @@ module FullSearch
         ActiveRecord::Base.connection
       end
 
-      def quote(value)
+      def q(value)
         connection.quote(value)
+      end
+
+      def qt(name)
+        connection.quote_table_name(name)
+      end
+
+      def qc(name)
+        connection.quote_column_name(name)
       end
 
       def damerau_levenshtein(a, b)

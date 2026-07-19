@@ -57,8 +57,8 @@ module FullSearch
 
         with_rebuild_lock(model) do
           drop_triggers!(model)
-          conn.execute("DROP TABLE IF EXISTS #{fts_table_name(model)};")
-          conn.execute("DROP TABLE IF EXISTS #{trigram_table_name(model)};")
+          conn.execute("DROP TABLE IF EXISTS #{qt(fts_table_name(model))};")
+          conn.execute("DROP TABLE IF EXISTS #{qt(trigram_table_name(model))};")
           conn.execute(create_virtual_table_sql(model))
           if dsl.typo_tolerance?
             FullSearch::Typo.warn_unsupported! unless FullSearch::Typo.supported?
@@ -92,7 +92,7 @@ module FullSearch
       end
 
       def optimize!(model)
-        connection.execute("INSERT INTO #{fts_table_name(model)}(#{fts_table_name(model)}) VALUES('optimize');")
+        connection.execute("INSERT INTO #{qt(fts_table_name(model))}(#{qt(fts_table_name(model))}) VALUES('optimize');")
       end
 
       def reindex_source_fields!(model)
@@ -103,8 +103,8 @@ module FullSearch
 
       def drop!(model)
         drop_triggers!(model)
-        connection.execute("DROP TABLE IF EXISTS #{fts_table_name(model)};")
-        connection.execute("DROP TABLE IF EXISTS #{trigram_table_name(model)};")
+        connection.execute("DROP TABLE IF EXISTS #{qt(fts_table_name(model))};")
+        connection.execute("DROP TABLE IF EXISTS #{qt(trigram_table_name(model))};")
       end
 
       def fts_table_name(model)
@@ -134,6 +134,14 @@ module FullSearch
 
       def q(value)
         connection.quote(value)
+      end
+
+      def qt(name)
+        connection.quote_table_name(name)
+      end
+
+      def qc(name)
+        connection.quote_column_name(name)
       end
 
       def model_table_exists?(model)
@@ -167,10 +175,10 @@ module FullSearch
       def create_virtual_table_sql(model)
         dsl = model.full_search_dsl
         columns = (dsl.fields + dsl.filters.map { |f| FilterColumnPlaceholder.new(name: f.name) })
-        column_list = columns.map { |c| (c.respond_to?(:unindexed?) && c.unindexed?) ? "#{c.name} UNINDEXED" : c.name }.join(", ")
+        column_list = columns.map { |c| (c.respond_to?(:unindexed?) && c.unindexed?) ? "#{qc(c.name)} UNINDEXED" : qc(c.name) }.join(", ")
 
         <<~SQL
-          CREATE VIRTUAL TABLE #{fts_table_name(model)} USING fts5(
+          CREATE VIRTUAL TABLE #{qt(fts_table_name(model))} USING fts5(
             #{column_list},
             tokenize='#{dsl.tokenize}'
           );
@@ -184,13 +192,13 @@ module FullSearch
           if c.respond_to?(:source) && c.source
             source_value_sql(c.source)
           else
-            "#{model.table_name}.#{c.name}"
+            "#{qt(model.table_name)}.#{qc(c.name)}"
           end
         end.join(", ")
 
         <<~SQL
-          INSERT INTO #{fts_table_name(model)}(rowid, #{cols.map(&:name).join(", ")})
-          SELECT #{model.table_name}.id, #{select} FROM #{model.table_name};
+          INSERT INTO #{qt(fts_table_name(model))}(rowid, #{cols.map { |c| qc(c.name) }.join(", ")})
+          SELECT #{qt(model.table_name)}.id, #{select} FROM #{qt(model.table_name)};
         SQL
       end
 
@@ -226,7 +234,7 @@ module FullSearch
 
       def drop_triggers!(model)
         (trigger_names(model) + trigram_trigger_names(model)).each do |name|
-          connection.execute("DROP TRIGGER IF EXISTS #{name};")
+          connection.execute("DROP TRIGGER IF EXISTS #{qt(name)};")
         end
       end
 
@@ -248,8 +256,8 @@ module FullSearch
         values = cols.map { |c| column_ref(c, prefix: "new") }.join(", ")
 
         <<~SQL
-          CREATE TRIGGER #{trigger_names(model).first} AFTER INSERT ON #{model.table_name} BEGIN
-            INSERT INTO #{fts_table_name(model)}(rowid, #{col_names(cols)})
+          CREATE TRIGGER #{qt(trigger_names(model).first)} AFTER INSERT ON #{qt(model.table_name)} BEGIN
+            INSERT INTO #{qt(fts_table_name(model))}(rowid, #{col_names(cols)})
             VALUES (new.id, #{values});
           END;
         SQL
@@ -257,8 +265,8 @@ module FullSearch
 
       def delete_trigger_sql(model)
         <<~SQL
-          CREATE TRIGGER #{trigger_names(model)[1]} AFTER DELETE ON #{model.table_name} BEGIN
-            DELETE FROM #{fts_table_name(model)} WHERE rowid = old.id;
+          CREATE TRIGGER #{qt(trigger_names(model)[1])} AFTER DELETE ON #{qt(model.table_name)} BEGIN
+            DELETE FROM #{qt(fts_table_name(model))} WHERE rowid = old.id;
           END;
         SQL
       end
@@ -268,12 +276,12 @@ module FullSearch
         cols = dsl.fields + dsl.filters
         values = cols.map { |c| column_ref(c, prefix: "new") }.join(", ")
         cols_str = col_names(cols)
-        fts_table = fts_table_name(model)
+        fts_table = qt(fts_table_name(model))
 
         when_clause = SoftDelete.active_update_clause(model)
 
         <<~SQL
-          CREATE TRIGGER #{trigger_names(model)[2]} AFTER UPDATE ON #{model.table_name} #{when_clause}
+          CREATE TRIGGER #{qt(trigger_names(model)[2])} AFTER UPDATE ON #{qt(model.table_name)} #{when_clause}
           BEGIN
             DELETE FROM #{fts_table} WHERE rowid = old.id;
             INSERT INTO #{fts_table}(rowid, #{cols_str})
@@ -284,11 +292,11 @@ module FullSearch
 
       def soft_delete_removal_trigger_sql(model)
         model.full_search_dsl
-        fts_table = fts_table_name(model)
+        fts_table = qt(fts_table_name(model))
         when_clause = SoftDelete.soft_delete_remove_clause(model)
 
         <<~SQL
-          CREATE TRIGGER #{trigger_names(model)[2]}_soft_delete AFTER UPDATE ON #{model.table_name} #{when_clause}
+          CREATE TRIGGER #{qt("#{trigger_names(model)[2]}_soft_delete")} AFTER UPDATE ON #{qt(model.table_name)} #{when_clause}
           BEGIN
             DELETE FROM #{fts_table} WHERE rowid = old.id;
           END;
@@ -304,10 +312,10 @@ module FullSearch
       def create_trigram_virtual_table_sql(model)
         dsl = model.full_search_dsl
         columns = (dsl.fields + dsl.filters.map { |f| FilterColumnPlaceholder.new(name: f.name) })
-        column_list = columns.map { |c| (c.respond_to?(:unindexed?) && c.unindexed?) ? "#{c.name} UNINDEXED" : c.name }.join(", ")
+        column_list = columns.map { |c| (c.respond_to?(:unindexed?) && c.unindexed?) ? "#{qc(c.name)} UNINDEXED" : qc(c.name) }.join(", ")
 
         <<~SQL
-          CREATE VIRTUAL TABLE #{trigram_table_name(model)} USING fts5(
+          CREATE VIRTUAL TABLE #{qt(trigram_table_name(model))} USING fts5(
             #{column_list},
             tokenize='trigram'
           );
@@ -321,13 +329,13 @@ module FullSearch
           if c.respond_to?(:source) && c.source
             source_value_sql(c.source)
           else
-            "#{model.table_name}.#{c.name}"
+            "#{qt(model.table_name)}.#{qc(c.name)}"
           end
         end.join(", ")
 
         <<~SQL
-          INSERT INTO #{trigram_table_name(model)}(rowid, #{cols.map(&:name).join(", ")})
-          SELECT #{model.table_name}.id, #{select} FROM #{model.table_name};
+          INSERT INTO #{qt(trigram_table_name(model))}(rowid, #{cols.map { |c| qc(c.name) }.join(", ")})
+          SELECT #{qt(model.table_name)}.id, #{select} FROM #{qt(model.table_name)};
         SQL
       end
 
@@ -337,8 +345,8 @@ module FullSearch
         values = cols.map { |c| column_ref(c, prefix: "new") }.join(", ")
 
         <<~SQL
-          CREATE TRIGGER #{trigram_trigger_names(model).first} AFTER INSERT ON #{model.table_name} BEGIN
-            INSERT INTO #{trigram_table_name(model)}(rowid, #{col_names(cols)})
+          CREATE TRIGGER #{qt(trigram_trigger_names(model).first)} AFTER INSERT ON #{qt(model.table_name)} BEGIN
+            INSERT INTO #{qt(trigram_table_name(model))}(rowid, #{col_names(cols)})
             VALUES (new.id, #{values});
           END;
         SQL
@@ -346,8 +354,8 @@ module FullSearch
 
       def delete_trigram_trigger_sql(model)
         <<~SQL
-          CREATE TRIGGER #{trigram_trigger_names(model)[1]} AFTER DELETE ON #{model.table_name} BEGIN
-            DELETE FROM #{trigram_table_name(model)} WHERE rowid = old.id;
+          CREATE TRIGGER #{qt(trigram_trigger_names(model)[1])} AFTER DELETE ON #{qt(model.table_name)} BEGIN
+            DELETE FROM #{qt(trigram_table_name(model))} WHERE rowid = old.id;
           END;
         SQL
       end
@@ -357,12 +365,12 @@ module FullSearch
         cols = dsl.fields + dsl.filters
         values = cols.map { |c| column_ref(c, prefix: "new") }.join(", ")
         cols_str = col_names(cols)
-        trigram_table = trigram_table_name(model)
+        trigram_table = qt(trigram_table_name(model))
 
         when_clause = SoftDelete.active_update_clause(model)
 
         <<~SQL
-          CREATE TRIGGER #{trigram_trigger_names(model)[2]} AFTER UPDATE ON #{model.table_name} #{when_clause}
+          CREATE TRIGGER #{qt(trigram_trigger_names(model)[2])} AFTER UPDATE ON #{qt(model.table_name)} #{when_clause}
           BEGIN
             DELETE FROM #{trigram_table} WHERE rowid = old.id;
             INSERT INTO #{trigram_table}(rowid, #{cols_str})
@@ -372,14 +380,14 @@ module FullSearch
       end
 
       def col_names(cols)
-        cols.map(&:name).join(", ")
+        cols.map { |c| qc(c.name) }.join(", ")
       end
 
       def column_ref(col, prefix:)
         if col.respond_to?(:source) && col.source
           "''"
         else
-          "#{prefix}.#{col.name}"
+          "#{prefix}.#{qc(col.name)}"
         end
       end
 

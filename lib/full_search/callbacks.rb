@@ -54,22 +54,24 @@ module FullSearch
       return unless field&.source
 
       value = record.instance_exec(&field.source)
-      table = FullSearch::Index.fts_table_name(record.class)
-      quoted_value = ActiveRecord::Base.connection.quote(value.to_s)
-      ActiveRecord::Base.connection.execute(
-        "UPDATE #{table} SET #{field.name} = #{quoted_value} WHERE rowid = #{record.id}"
+      table = qt(FullSearch::Index.fts_table_name(record.class))
+      conn = ActiveRecord::Base.connection
+      conn.execute(
+        "UPDATE #{table} SET #{qc(field.name)} = #{q(value.to_s)} WHERE rowid = #{q(record.id)}"
       )
     end
 
     def self.remove_record!(record)
-      table = FullSearch::Index.fts_table_name(record.class)
-      ActiveRecord::Base.connection.execute("DELETE FROM #{table} WHERE rowid = #{record.id}")
+      table = qt(FullSearch::Index.fts_table_name(record.class))
+      conn = ActiveRecord::Base.connection
+      conn.execute("DELETE FROM #{table} WHERE rowid = #{q(record.id)}")
     end
 
     def self.reindex_dependents!(parent_record, dependent_model, field)
       fk = association_key(dependent_model, field.reindex_on)
-      sql = "SELECT id FROM #{dependent_model.table_name} WHERE #{fk} = #{parent_record.id}"
-      dependent_ids = ActiveRecord::Base.connection.execute(sql).map { |r| r["id"] }
+      conn = ActiveRecord::Base.connection
+      sql = "SELECT id FROM #{qt(dependent_model.table_name)} WHERE #{qc(fk)} = #{q(parent_record.id)}"
+      dependent_ids = conn.execute(sql).map { |r| r["id"] }
 
       dependent_ids.each do |dep_id|
         if field.async
@@ -79,6 +81,22 @@ module FullSearch
           reindex_field!(dependent, field.name) if dependent
         end
       end
+    end
+
+    def self.connection
+      ActiveRecord::Base.connection
+    end
+
+    def self.q(value)
+      connection.quote(value)
+    end
+
+    def self.qt(name)
+      connection.quote_table_name(name)
+    end
+
+    def self.qc(name)
+      connection.quote_column_name(name)
     end
 
     def self.associated_class(model, association_name)
