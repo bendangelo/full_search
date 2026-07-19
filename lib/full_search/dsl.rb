@@ -4,7 +4,7 @@ module FullSearch
   class Dsl
     attr_reader :fields, :exact_matches, :filters, :model_class, :tokenize, :highlight_config, :rank_bys
 
-    Field = Data.define(:name, :weight, :source, :reindex_on, :async)
+    Field = Data.define(:name, :weight, :source, :reindex_on, :async, :as)
     ExactMatch = Data.define(:name, :source)
     Filter = Data.define(:name, :required)
     RankBy = Data.define(:column, :direction)
@@ -19,11 +19,14 @@ module FullSearch
       @soft_delete_column = nil
     end
 
-    def field(name, weight: 1, source: nil, reindex_on: nil, async: FullSearch.config.default_async_reindex)
+    def field(name, weight: 1, source: nil, reindex_on: nil, async: FullSearch.config.default_async_reindex, as: nil)
       unless valid_name?(name)
         raise InvalidFieldError, "Invalid field name: #{name.inspect}"
       end
-      @fields << Field.new(name: name.to_s, weight: weight.to_i, source: source, reindex_on: reindex_on&.to_s, async: async)
+      if as && !valid_name?(as)
+        raise InvalidFieldError, "Invalid field alias (as): #{as.inspect}"
+      end
+      @fields << Field.new(name: name.to_s, weight: weight.to_i, source: source, reindex_on: reindex_on&.to_s, async: async, as: as&.to_s)
     end
 
     def exact_match(name, source: -> { public_send(name) })
@@ -88,7 +91,7 @@ module FullSearch
         soft_delete_column,
         typo_tolerance?,
         typo_tolerance_min_term_length,
-        fields.map { |f| [f.name, f.weight, f.source.nil? ? "column" : f.source.source_location&.join(":"), f.reindex_on, f.async] },
+        fields.map { |f| [f.name, f.weight, f.source.nil? ? "column" : f.source.source_location&.join(":"), f.reindex_on, f.async, f.as] },
         exact_matches.map { |e| [e.name, e.source&.source_location&.join(":")] },
         filters.map { |f| [f.name, f.required] },
         rank_bys.map { |r| [r.column, r.direction] }

@@ -40,7 +40,7 @@ module FullSearch
 
       def full_search_text_for(field_name)
         dsl = self.class.full_search_dsl
-        field = dsl.fields.find { |f| f.name == field_name.to_s }
+        field = dsl.fields.find { |f| f.name == field_name.to_s || f.as == field_name.to_s }
         return nil unless field
 
         field.source ? instance_exec(&field.source) : public_send(field.name)
