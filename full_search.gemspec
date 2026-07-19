@@ -11,7 +11,11 @@ Gem::Specification.new do |spec|
   spec.homepage = "https://github.com/bendangelo/full_search"
   spec.license = "MIT"
 
-  spec.required_ruby_version = ">= 3.2.0"
+  spec.required_ruby_version = ">= 3.1.0"
+  spec.required_rubygems_version = ">= 2.0"
+
+  spec.cert_chain = ["cert/full_search.pem"]
+  spec.signing_key = "cert/priv_key.pem" if File.exist?("cert/priv_key.pem")
 
   spec.files = Dir["lib/**/*", "README.md", "LICENSE"]
   spec.executables = []
@@ -27,4 +31,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rake", "~> 13.0"
 
   spec.add_development_dependency "irb"
+  spec.add_development_dependency "standard", "~> 1.40"
 end
