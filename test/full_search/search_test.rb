@@ -159,6 +159,58 @@ class FullSearch::SearchTest < ActiveSupport::TestCase
     end
   end
 
+  def test_stale_config_logs_warning_when_configured
+    original_behavior = FullSearch.config.stale_query_behavior
+    FullSearch.config.stale_query_behavior = :log_and_fallback
+
+    log_string = StringIO.new
+    Rails.define_singleton_method(:logger) { Logger.new(log_string) } unless Rails.respond_to?(:logger)
+
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name
+        filter :account_id, required: true
+      end
+    end
+    model.table_name = "customers"
+    account = Account.create!(name: "Acme")
+    model.create!(account_id: account.id, first_name: "Sam")
+    FullSearch::Index.rebuild!(model)
+
+    ActiveRecord::Base.connection.execute(
+      "UPDATE full_search_index_versions SET config_hash = 'fakehash' WHERE table_name = 'customers'"
+    )
+
+    assert_nothing_raised do
+      results = model.full_search("Sam", filters: {account_id: account.id})
+      assert_not_empty results
+    end
+
+    assert_match(/stale/i, log_string.string)
+  ensure
+    FullSearch.config.stale_query_behavior = original_behavior
+  end
+
+  def test_no_stored_config_does_not_raise
+    ActiveRecord::Base.connection.execute(
+      "DELETE FROM full_search_index_versions WHERE table_name = 'customers'"
+    )
+
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name
+        filter :account_id, required: true
+      end
+    end
+    model.table_name = "customers"
+    account = Account.create!(name: "Acme")
+    model.create!(account_id: account.id, first_name: "Sam")
+
+    assert_nothing_raised do
+      model.full_search("Sam", filters: {account_id: account.id})
+    end
+  end
+
   def test_nil_filter_values
     account = Account.create!(name: "Acme")
     @customer_model.create!(account_id: account.id, first_name: "Sam")
