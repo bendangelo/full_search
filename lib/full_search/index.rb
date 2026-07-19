@@ -190,12 +190,7 @@ module FullSearch
         columns = (dsl.fields + dsl.filters.map { |f| FilterColumnPlaceholder.new(name: f.name) })
         column_list = columns.map { |c| (c.respond_to?(:unindexed?) && c.unindexed?) ? "#{qc(c.name)} UNINDEXED" : qc(c.name) }.join(", ")
 
-        <<~SQL
-          CREATE VIRTUAL TABLE #{qt(fts_table_name(model))} USING fts5(
-            #{column_list},
-            tokenize='#{dsl.tokenize}'
-          );
-        SQL
+        "CREATE VIRTUAL TABLE #{qt(fts_table_name(model))} USING fts5(#{column_list}, tokenize='#{dsl.tokenize}');"
       end
 
       def backfill_sql(model)
@@ -327,12 +322,7 @@ module FullSearch
         columns = (dsl.fields + dsl.filters.map { |f| FilterColumnPlaceholder.new(name: f.name) })
         column_list = columns.map { |c| (c.respond_to?(:unindexed?) && c.unindexed?) ? "#{qc(c.name)} UNINDEXED" : qc(c.name) }.join(", ")
 
-        <<~SQL
-          CREATE VIRTUAL TABLE #{qt(trigram_table_name(model))} USING fts5(
-            #{column_list},
-            tokenize='trigram'
-          );
-        SQL
+        "CREATE VIRTUAL TABLE #{qt(trigram_table_name(model))} USING fts5(#{column_list}, tokenize='trigram');"
       end
 
       def backfill_trigram_sql(model)

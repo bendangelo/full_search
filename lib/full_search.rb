@@ -24,6 +24,7 @@ require "full_search/reindex_job"
 require "full_search/optimize_job"
 require "full_search/test_helpers"
 require "full_search/multi_search"
+require "full_search/schema_dumper_patch"
 
 ActiveSupport.on_load(:active_record) do
   include FullSearch::Model
