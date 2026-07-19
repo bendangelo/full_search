@@ -3,6 +3,7 @@
 require "active_record"
 require "active_support"
 require "active_support/concern"
+require "set"
 
 require "full_search/version"
 require "full_search/config"
@@ -30,7 +31,15 @@ end
 module FullSearch
   class << self
     def models
-      @models ||= []
+      @models ||= Set.new
+    end
+
+    def register_model(model)
+      models << model
+    end
+
+    def deregister_model(model)
+      models.delete(model)
     end
 
     def optimize!

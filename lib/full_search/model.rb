@@ -13,7 +13,7 @@ module FullSearch
           FullSearch::Index.ensure_table!(self)
           FullSearch::Callbacks.install!(self)
           include InstanceMethods
-          FullSearch.models << self unless FullSearch.models.include?(self)
+          FullSearch.register_model(self)
           @full_search_dsl
         else
           FullSearch::Search.new(self, query_or_options, filters: filters, include_soft_deleted: include_soft_deleted, limit: limit, offset: offset, highlight: highlight, highlight_fields: highlight_fields, matching_strategy: matching_strategy).relation
