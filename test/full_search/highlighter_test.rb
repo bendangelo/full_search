@@ -65,7 +65,7 @@ class FullSearch::HighlighterTest < ActiveSupport::TestCase
     assert_includes result.full_search_highlight_fields["first_name"], "**Samantha**"
   end
 
-  def test_snippet_with_short_prefix_via_like_fallback
+  def test_snippet_with_short_prefix_via_trigram
     model = Class.new(Customer) do
       full_search do
         field :first_name, weight: 5
@@ -80,10 +80,10 @@ class FullSearch::HighlighterTest < ActiveSupport::TestCase
     model.create!(account_id: account.id, first_name: "Sarah")
     FullSearch::Index.rebuild!(model)
 
-    results = model.full_search("sa", filters: { account_id: account.id }, highlight: true).to_a
+    results = model.full_search("sar", filters: { account_id: account.id }, highlight: true).to_a
     result = results.first
     assert result.respond_to?(:full_search_snippet)
     assert result.full_search_snippet.include?("<mark>")
-    assert result.full_search_snippet.include?("Sa")
+    assert result.full_search_snippet.include?("Sar")
   end
 end

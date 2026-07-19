@@ -73,7 +73,7 @@ class FullSearch::SearchTest < ActiveSupport::TestCase
     assert_includes results.to_a, customer
   end
 
-  def test_short_prefix_with_trigram_tokenizer_falls_back_to_like
+  def test_short_prefix_with_trigram_tokenizer_returns_empty
     account = Account.create!(name: "Acme")
     model = Class.new(Customer) do
       full_search do
@@ -85,11 +85,11 @@ class FullSearch::SearchTest < ActiveSupport::TestCase
       end
     end
     model.table_name = "customers"
-    customer = model.create!(account_id: account.id, first_name: "Sarah")
+    model.create!(account_id: account.id, first_name: "Sarah")
     FullSearch::Index.rebuild!(model)
 
     results = model.full_search("sa", filters: { account_id: account.id })
-    assert_includes results.to_a, customer
+    assert_empty results
   end
 
   def test_missing_required_filter_raises

@@ -16,8 +16,12 @@ module FullSearch
       @matching_strategy = matching_strategy
     end
 
+    MIN_TERM_LENGTH = 3
+
     def relation
       validate_required_filters!
+
+      return model.none if dsl.tokenize == "trigram" && query.length < MIN_TERM_LENGTH
 
       parsed = QueryParser.parse(query)
       exact_ids = ExactMatch.ids_for(model, query, filters)
