@@ -219,7 +219,9 @@ module FullSearch
 
       def trigger_names(model)
         base = fts_table_name(model)
-        %W[#{base}_ai #{base}_ad #{base}_au #{base}_au_soft_delete]
+        names = %W[#{base}_ai #{base}_ad #{base}_au]
+        names << "#{base}_au_soft_delete" if model.full_search_dsl.soft_delete_column
+        names
       end
 
       def trigram_trigger_names(model)
@@ -372,7 +374,7 @@ module FullSearch
         if FullSearch.config.lock_rebuilds
           connection.transaction do
             connection.execute(
-              "INSERT INTO full_search_index_versions (table_name, config_hash, rebuilt_at) VALUES (#{q(model.table_name)}, #{q("")}, datetime('now'))
+              "INSERT INTO full_search_index_versions (table_name, config_hash, rebuilt_at) VALUES (#{q(model.table_name)}, #{q("__rebuilding__")}, datetime('now'))
                ON CONFLICT(table_name) DO UPDATE SET config_hash=excluded.config_hash;"
             )
             yield

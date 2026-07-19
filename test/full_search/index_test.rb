@@ -72,4 +72,18 @@ class FullSearch::IndexTest < ActiveSupport::TestCase
     FullSearch::Index.ensure_table!(@model)
     assert FullSearch::Index.send(:table_exists?, @model)
   end
+
+  def test_rebuild_lock_does_not_store_empty_config
+    FullSearch::Index.rebuild!(@model)
+    stored = ActiveRecord::Base.connection.execute(
+      "SELECT config_hash FROM full_search_index_versions WHERE table_name = 'customers'"
+    ).first
+    refute_equal "", stored["config_hash"]
+    refute_equal "__rebuilding__", stored["config_hash"]
+  end
+
+  def test_rebuild_if_needed_returns_false_when_current
+    FullSearch::Index.rebuild!(@model)
+    refute FullSearch::Index.rebuild_if_needed!(@model)
+  end
 end
