@@ -404,6 +404,9 @@ module FullSearch
         end
       end
 
+      # NOTE: This lock prevents concurrent rebuilds within the same process/connection only.
+      # For multi-process or multi-host deployments, run full_search:rebuild from a single
+      # deployment step. See README.
       def with_rebuild_lock(model)
         if FullSearch.config.lock_rebuilds
           connection.transaction do

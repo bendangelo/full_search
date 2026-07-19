@@ -12,7 +12,7 @@ SQLite FTS5 full-text search for Rails/ActiveRecord. A lightweight, self-contain
 
 ## When to use
 
-`full_search` is designed for apps with **100,000 records or fewer per table** that want full-text search without running a separate service. If you're on SQLite and need keyword search, phrase matching, typo-tolerant substring queries, or result highlighting, this gem gives you production-quality search with zero infrastructure — no Elasticsearch, no Meilisearch, no Sidekiq queue.
+`full_search` is designed for apps with **100,000 records or fewer per table** that want full-text search without running a separate service. If you're on SQLite and need keyword search, phrase matching, typo-tolerant substring queries, or result highlighting, this gem gives you full-text search suitable for small to medium SQLite-backed apps with zero infrastructure — no Elasticsearch, no Meilisearch, no Sidekiq queue.
 
 ## Installation
 
@@ -78,6 +78,10 @@ These two operations are often confused:
 - **Rebuild** (`full_search:rebuild` / `Customer.rebuild!`) — drops and recreates the FTS virtual table. Needed when the DSL changes (fields added/removed, tokenizer changed, etc.). The table is re-created from scratch, backfilled, triggers re-installed, and the index is optimized.
 - **Reindex** (`Customer.reindex!` / `FullSearch::Index.reindex_source_fields!`) — updates existing FTS rows with fresh values from computed `source:` fields only. The table structure is untouched. Database triggers cover regular column changes automatically; only Ruby-evaluated `source:` blocks need an explicit reindex.
 
+> **Note on rebuild locking:** The `lock_rebuilds` option prevents concurrent rebuilds
+> within the same process/connection. For multi-process or multi-host deployments,
+> run `full_search:rebuild` from a single deployment step.
+
 ### Auto-rebuild on app load
 
 When `auto_rebuild_schema` is enabled (default in the generated initializer), the railtie hooks into Rails `after_initialize` and:
@@ -140,7 +144,7 @@ If you're not on Solid Queue, most job frameworks support recurring schedules vi
 
 ### Config hash drift detection
 
-Every FTS table stores a SHA256 digest of its DSL configuration in the `full_search_index_versions` table. When the DSL changes (e.g., adding a field), the stored hash no longer matches, and `rebuild!` is triggered automatically (if `auto_rebuild_schema` is true) to bring the index in line with the new definition. If `auto_rebuild_schema` is false, queries still run but raise `ConfigChangedError` when the hash doesn't match.
+Every FTS table stores a SHA256 digest of its DSL configuration in the `full_search_index_versions` table. When the DSL changes (e.g., adding a field), the stored hash no longer matches, and `rebuild!` is triggered automatically (if `auto_rebuild_schema` is true) to bring the index in line with the new definition. If `auto_rebuild_schema` is false, queries raise `ConfigChangedError` when the hash doesn't match (or log a warning and fall back if configured with `:log_and_fallback`).
 
 ## Query operators
 
@@ -177,9 +181,15 @@ class Customer < ApplicationRecord
 end
 ```
 
-`typo_tolerance` uses an FTS5 trigram shadow table as a fallback when the primary index returns no results. It is substring matching, not edit-distance correction, and requires SQLite >= 3.34.
+`typo_tolerance` uses an FTS5 trigram shadow table as a fallback when the primary index returns no results. It is substring/trigram fallback, not edit-distance correction, and requires SQLite >= 3.34.
 
 ## Known limitations
 
 - Queries run with `highlight: true` return an Array of records, not an `ActiveRecord::Relation`. No further chaining (`.where`, `.order`, `.limit`) is possible after highlighting is applied.
-- Per-model only; no built-in multi-model aggregator
+- Per-model only; `multi_search` returns grouped results, not a unified ranked list
+- No built-in multi-model aggregator
+
+## Security
+
+If you discover a security vulnerability, please email the maintainer directly at
+the address listed in the gemspec. Do not file a public issue.

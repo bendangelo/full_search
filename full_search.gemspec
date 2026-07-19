@@ -21,14 +21,14 @@ Gem::Specification.new do |spec|
   spec.executables = []
   spec.require_paths = ["lib"]
 
-  spec.add_dependency "activerecord", ">= 8.0"
-  spec.add_dependency "railties", ">= 8.0"
+  spec.add_dependency "activerecord", ">= 8.0", "< 9"
+  spec.add_dependency "railties", ">= 8.0", "< 9"
   spec.add_dependency "sqlite3", ">= 2.0"
-  spec.add_dependency "ostruct", ">= 0.6"
 
   spec.add_development_dependency "minitest", "~> 5.0"
   spec.add_development_dependency "rake", "~> 13.0"
 
+  spec.add_development_dependency "ostruct", ">= 0.6"
   spec.add_development_dependency "irb"
   spec.add_development_dependency "standard", "~> 1.40"
 end
