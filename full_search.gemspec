@@ -14,9 +14,6 @@ Gem::Specification.new do |spec|
   spec.required_ruby_version = ">= 3.1.0"
   spec.required_rubygems_version = ">= 2.0"
 
-  spec.cert_chain = ["cert/full_search.pem"]
-  spec.signing_key = "cert/priv_key.pem" if File.exist?("cert/priv_key.pem")
-
   spec.files = Dir["lib/**/*", "README.md", "LICENSE"]
   spec.executables = []
   spec.require_paths = ["lib"]

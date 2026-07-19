@@ -4,10 +4,6 @@ require "bundler/gem_tasks"
 require "rake/testtask"
 require "standard/rake"
 
-Bundler::GemHelper.install do |helper|
-  helper.signing_key = ENV['GEM_SIGNING_KEY'] || '~/.gem/gem-private_key.pem'
-end
-
 Rake::TestTask.new(:test) do |t|
   t.libs << "lib"
   t.libs << "test"
