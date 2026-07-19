@@ -150,6 +150,18 @@ If you're not on Solid Queue, most job frameworks support recurring schedules vi
 
 Every FTS table stores a SHA256 digest of its DSL configuration in the `full_search_index_versions` table. When the DSL changes (e.g., adding a field), the stored hash no longer matches, and `rebuild!` is triggered automatically (if `auto_rebuild_schema` is true) to bring the index in line with the new definition. If `auto_rebuild_schema` is false, queries raise `ConfigChangedError` when the hash doesn't match (or log a warning and fall back if configured with `:log_and_fallback`).
 
+### Query-time auto-rebuild in local environments
+
+By default, the generated initializer also enables `auto_rebuild_on_stale_query` in local environments:
+
+```ruby
+FullSearch.configure do |config|
+  config.auto_rebuild_on_stale_query = Rails.env.local?
+end
+```
+
+When this option is `true`, the first search that detects a stale index automatically calls `FullSearch::Index.rebuild_if_needed!` and then proceeds with the query, so you don't need to restart the server or run a Rake task during iterative development. In production, this defaults to `false`; use `full_search:rebuild` or boot-time `auto_rebuild_schema` instead.
+
 ## Query operators
 
 ```ruby
