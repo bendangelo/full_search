@@ -3,6 +3,14 @@
 require "test_helper"
 
 class FullSearch::ModelRegistryTest < ActiveSupport::TestCase
+  def setup
+    @initial_models = FullSearch.models.dup
+  end
+
+  def teardown
+    FullSearch.models.replace(@initial_models)
+  end
+
   def test_models_is_a_set_of_unique_classes
     assert_kind_of Set, FullSearch.models
   end
