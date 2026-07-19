@@ -36,4 +36,26 @@ class FullSearch::QueryParserTest < ActiveSupport::TestCase
   def test_empty
     assert_equal [], FullSearch::QueryParser.parse("")
   end
+
+  def test_long_query_is_rejected
+    assert_raises(FullSearch::InvalidQueryError) do
+      FullSearch::QueryParser.parse("a" * 5000)
+    end
+  end
+
+  def test_query_with_null_bytes_is_rejected
+    assert_raises(FullSearch::InvalidQueryError) do
+      FullSearch::QueryParser.parse("foo\0bar")
+    end
+  end
+
+  def test_leading_or_returns_single_term
+    parsed = FullSearch::QueryParser.parse("OR foo")
+    assert_equal [:term, "foo"], parsed
+  end
+
+  def test_trailing_or_returns_single_term
+    parsed = FullSearch::QueryParser.parse("foo OR")
+    assert_equal [:term, "foo"], parsed
+  end
 end

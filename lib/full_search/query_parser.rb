@@ -6,8 +6,12 @@ module FullSearch
   module QueryParser
     Token = Data.define(:type, :value)
 
+    MAX_QUERY_LENGTH = 255
+
     def self.parse(query)
-      tokens = tokenize(query.to_s.strip)
+      query = query.to_s.strip
+      validate!(query)
+      tokens = tokenize(query)
       return [] if tokens.empty?
 
       or_clauses = split_or(tokens)
@@ -60,6 +64,13 @@ module FullSearch
       when :exclude
         nil
       end
+    end
+
+    def self.validate!(query)
+      if query.bytesize > MAX_QUERY_LENGTH
+        raise InvalidQueryError, "Query too long (max #{MAX_QUERY_LENGTH} chars)"
+      end
+      raise InvalidQueryError, "Query contains invalid characters" if query.include?("\x00")
     end
 
     def self.tokenize(query)
