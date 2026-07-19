@@ -10,8 +10,8 @@ module FullSearch
           @full_search_dsl ||= FullSearch::Dsl.new(self)
           @full_search_dsl.tokenize(query_or_options[:tokenize]) if query_or_options.is_a?(Hash) && query_or_options.key?(:tokenize)
           @full_search_dsl.instance_eval(&block) if block_given?
-          FullSearch::Index.ensure_table!(self)
           FullSearch::Callbacks.install!(self)
+          FullSearch::Index.ensure_table!(self)
           include InstanceMethods
 
           FullSearch.register_model(self)

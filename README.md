@@ -6,7 +6,7 @@ SQLite FTS5 full-text search for Rails/ActiveRecord. A lightweight, self-contain
 
 ## Requirements
 
-- Ruby 3.1+
+- Ruby 3.2+
 - Rails 8.0+
 - SQLite 3.34+ (if using typo tolerance)
 

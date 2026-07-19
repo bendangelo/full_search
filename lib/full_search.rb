@@ -47,6 +47,13 @@ module FullSearch
     def optimize!
       models.each { |model| Index.optimize!(model) }
     end
+
+    def setup!
+      models.each do |model|
+        Index.ensure_table!(model)
+        Callbacks.install!(model)
+      end
+    end
   end
 end
 

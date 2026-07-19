@@ -14,7 +14,13 @@ end
 module FullSearch
   class Index
     class << self
+      def verified_tables
+        @verified_tables ||= Set.new
+      end
+
       def ensure_table!(model)
+        return if model.respond_to?(:table_name) && verified_tables.include?(model.table_name)
+
         sqlite!(model)
 
         conn = connection
@@ -44,6 +50,8 @@ module FullSearch
 
         store_config_hash!(model)
         ensure_triggers!(model) if model_table_exists?(model)
+
+        verified_tables.add(model.table_name)
       end
 
       def rebuild!(model)
@@ -70,6 +78,7 @@ module FullSearch
           create_triggers!(model)
           optimize!(model)
           store_config_hash!(model, rebuilt_at: Time.current)
+          verified_tables.add(model.table_name)
         end
       end
 
@@ -103,6 +112,7 @@ module FullSearch
       end
 
       def drop!(model)
+        verified_tables.delete(model.table_name)
         sqlite!(model)
         drop_triggers!(model)
         connection.execute("DROP TABLE IF EXISTS #{qt(fts_table_name(model))};")

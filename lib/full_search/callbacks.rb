@@ -59,12 +59,16 @@ module FullSearch
       conn.execute(
         "UPDATE #{table} SET #{qc(field.name)} = #{q(value.to_s)} WHERE rowid = #{q(record.id)}"
       )
+    rescue => e
+      raise unless e.message.include?("no such table")
     end
 
     def self.remove_record!(record)
       table = qt(FullSearch::Index.fts_table_name(record.class))
       conn = ActiveRecord::Base.connection
       conn.execute("DELETE FROM #{table} WHERE rowid = #{q(record.id)}")
+    rescue => e
+      raise unless e.message.include?("no such table")
     end
 
     def self.reindex_dependents!(parent_record, dependent_model, field)
