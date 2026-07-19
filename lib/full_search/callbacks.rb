@@ -83,20 +83,12 @@ module FullSearch
       end
     end
 
+    class << self
+      include FullSearch::Quoting
+    end
+
     def self.connection
       ActiveRecord::Base.connection
-    end
-
-    def self.q(value)
-      connection.quote(value)
-    end
-
-    def self.qt(name)
-      connection.quote_table_name(name)
-    end
-
-    def self.qc(name)
-      connection.quote_column_name(name)
     end
 
     def self.associated_class(model, association_name)

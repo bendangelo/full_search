@@ -6,6 +6,8 @@ require "active_support/concern"
 
 require "full_search/version"
 require "full_search/config"
+require "full_search/distance"
+require "full_search/quoting"
 require "full_search/errors"
 require "full_search/tokenizer"
 require "full_search/dsl"
