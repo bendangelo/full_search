@@ -1,6 +1,14 @@
 # frozen_string_literal: true
 
-require "ostruct"
+class FilterColumnPlaceholder
+  attr_reader :name
+  def initialize(name:)
+    @name = name.to_s
+  end
+  def unindexed?
+    true
+  end
+end
 
 module FullSearch
   class Index
@@ -157,7 +165,7 @@ module FullSearch
 
       def create_virtual_table_sql(model)
         dsl = model.full_search_dsl
-        columns = (dsl.fields + dsl.filters.map { |f| OpenStruct.new(name: f.name, unindexed?: true) })
+        columns = (dsl.fields + dsl.filters.map { |f| FilterColumnPlaceholder.new(name: f.name) })
         column_list = columns.map { |c| c.respond_to?(:unindexed?) && c.unindexed? ? "#{c.name} UNINDEXED" : c.name }.join(", ")
 
         <<~SQL
@@ -290,7 +298,7 @@ module FullSearch
 
       def create_trigram_virtual_table_sql(model)
         dsl = model.full_search_dsl
-        columns = (dsl.fields + dsl.filters.map { |f| OpenStruct.new(name: f.name, unindexed?: true) })
+        columns = (dsl.fields + dsl.filters.map { |f| FilterColumnPlaceholder.new(name: f.name) })
         column_list = columns.map { |c| c.respond_to?(:unindexed?) && c.unindexed? ? "#{c.name} UNINDEXED" : c.name }.join(", ")
 
         <<~SQL
