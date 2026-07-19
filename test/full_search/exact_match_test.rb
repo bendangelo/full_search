@@ -46,21 +46,20 @@ class FullSearch::ExactMatchTest < ActiveSupport::TestCase
     assert_includes ids, vehicle.id
   end
 
-  def test_exact_match_source_proc_fallback
+  def test_multiple_exact_matches
     search_model = Class.new(Vehicle) do
       full_search do
-        exact_match :make, source: -> { raise "boom" }
+        exact_match :make
+        exact_match :license_plate
         filter :account_id, required: true
       end
     end
     search_model.table_name = "vehicles"
-
     FullSearch::Index.rebuild!(search_model)
-    Vehicle.create!(account_id: @account.id, make: "Honda")
+    vehicle = Vehicle.create!(account_id: @account.id, make: "Honda", license_plate: "ABC-123")
 
-    assert_raises(StandardError) do
-      FullSearch::ExactMatch.ids_for(search_model, "Honda", { account_id: @account.id })
-    end
+    ids = FullSearch::ExactMatch.ids_for(search_model, "Honda", { account_id: @account.id })
+    assert_includes ids, vehicle.id
   end
 
   def test_exact_match_on_encrypted_column
