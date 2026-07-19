@@ -21,6 +21,7 @@ module FullSearch
     def relation
       validate_filter_keys!
       validate_required_filters!
+      check_stale_config!
 
       return model.none if dsl.tokenize == "trigram" && query.length < MIN_TERM_LENGTH && !dsl.typo_tolerance?
 
@@ -68,6 +69,20 @@ module FullSearch
       dsl.filters.each do |filter|
         next unless filter.required
         raise MissingRequiredFilterError, "Missing required filter: #{filter.name}" unless filters.key?(filter.name.to_sym) || filters.key?(filter.name)
+      end
+    end
+
+    def check_stale_config!
+      stored = FullSearch::Index.stored_config_hash(model)
+      return unless stored
+
+      if stored != dsl.config_hash
+        case FullSearch.config.stale_query_behavior
+        when :raise
+          raise ConfigChangedError, "FTS index for #{model.table_name} is stale; run full_search:rebuild"
+        when :log_and_fallback
+          Rails.logger.warn("[full_search] FTS index for #{model.table_name} is stale; results may be incomplete")
+        end
       end
     end
 

@@ -138,6 +138,27 @@ class FullSearch::SearchTest < ActiveSupport::TestCase
     assert_includes results.to_a, customer
   end
 
+  def test_stale_config_raises_error
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name
+        filter :account_id, required: true
+      end
+    end
+    model.table_name = "customers"
+    account = Account.create!(name: "Acme")
+    model.create!(account_id: account.id, first_name: "Sam")
+    FullSearch::Index.rebuild!(model)
+
+    ActiveRecord::Base.connection.execute(
+      "UPDATE full_search_index_versions SET config_hash = 'fakehash' WHERE table_name = 'customers'"
+    )
+
+    assert_raises(FullSearch::ConfigChangedError) do
+      model.full_search("Sam", filters: {account_id: account.id})
+    end
+  end
+
   def test_nil_filter_values
     account = Account.create!(name: "Acme")
     @customer_model.create!(account_id: account.id, first_name: "Sam")
