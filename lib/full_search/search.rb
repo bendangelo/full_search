@@ -19,6 +19,7 @@ module FullSearch
     MIN_TERM_LENGTH = 3
 
     def relation
+      validate_filter_keys!
       validate_required_filters!
 
       return model.none if dsl.tokenize == "trigram" && query.length < MIN_TERM_LENGTH && !dsl.typo_tolerance?
@@ -52,6 +53,15 @@ module FullSearch
 
     def dsl
       model.full_search_dsl
+    end
+
+    def validate_filter_keys!
+      allowed = dsl.filters.map(&:name).to_set
+      filters.each_key do |key|
+        unless allowed.include?(key.to_s)
+          raise MissingRequiredFilterError, "Unknown filter: #{key}"
+        end
+      end
     end
 
     def validate_required_filters!
