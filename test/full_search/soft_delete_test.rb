@@ -78,10 +78,11 @@ class FullSearch::SoftDeleteTest < ActiveSupport::TestCase
       end
     end
     model.table_name = "customers"
+    FullSearch::Index.rebuild!(model)
+
     account = Account.create!(name: "Acme")
     good = model.create!(account_id: account.id, first_name: "Samantha", last_name: "Smith")
     model.create!(account_id: account.id, first_name: "Samantha", last_name: "Smith", discarded_at: Time.current)
-    FullSearch::Index.rebuild!(model)
 
     # 2-char query forces like_prefix_ids fallback (trigram requires 3+ chars)
     results = model.full_search("sa", filters: { account_id: account.id })

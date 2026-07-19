@@ -202,7 +202,11 @@ module FullSearch
           "SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name=#{q(model.table_name)}"
         ).map { |r| r["name"] }
 
-        create_triggers!(model) unless (trigger_names(model) - existing).empty?
+        expected = trigger_names(model)
+        expected += trigram_trigger_names(model) if model.full_search_dsl.typo_tolerance?
+        return if (expected - existing).empty? && (existing - expected).empty?
+
+        rebuild!(model)
       end
 
       def create_triggers!(model)

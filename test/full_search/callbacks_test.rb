@@ -35,15 +35,11 @@ class FullSearch::CallbacksTest < ActiveSupport::TestCase
     save_count = model._save_callbacks.to_a.size
     destroy_count = model._destroy_callbacks.to_a.size
 
-    model.full_search do
-      field :computed, source: -> { make&.upcase }
-      filter :account_id, required: true
-    end
+    FullSearch::Callbacks.install!(model)
 
     assert_equal save_count, model._save_callbacks.to_a.size
     assert_equal destroy_count, model._destroy_callbacks.to_a.size
   ensure
-    FullSearch::Callbacks.reset_installed_flag!(model)
     FullSearch::Index.drop!(model) rescue nil
   end
 
@@ -58,18 +54,12 @@ class FullSearch::CallbacksTest < ActiveSupport::TestCase
     model.table_name = "vehicles"
     FullSearch::Index.rebuild!(model)
 
-    model.full_search do
-      field :computed, source: -> { make&.upcase }
-      filter :account_id, required: true
-    end
-
     vehicle = model.create!(account_id: account.id, make: "Honda")
     row = ActiveRecord::Base.connection.execute(
       "SELECT computed FROM #{FullSearch::Index.fts_table_name(model)} WHERE rowid = #{vehicle.id}"
     ).first
     assert_equal "HONDA", row["computed"]
   ensure
-    FullSearch::Callbacks.reset_installed_flag!(model)
     FullSearch::Index.drop!(model) rescue nil
   end
 

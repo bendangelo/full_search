@@ -20,38 +20,44 @@ module FullSearch
     end
 
     def field(name, weight: 1, source: nil, reindex_on: nil, async: FullSearch.config.default_async_reindex, as: nil, version: nil)
-      raise InvalidFieldError, "Duplicate name: #{name.inspect}" if name_taken?(name)
       unless valid_name?(name)
         raise InvalidFieldError, "Invalid field name: #{name.inspect}"
       end
       if as && !valid_name?(as)
         raise InvalidFieldError, "Invalid field alias (as): #{as.inspect}"
       end
-      @fields << Field.new(name: name.to_s, weight: weight.to_i, source: source, reindex_on: reindex_on&.to_s, async: async, as: as&.to_s, version: version)
+      str = name.to_s
+      raise InvalidFieldError, "Duplicate field name: #{name.inspect}" if fields.any? { |f| f.name == str }
+      raise InvalidFieldError, "Field name conflicts with filter: #{name.inspect}" if filters.any? { |f| f.name == str }
+      @fields << Field.new(name: str, weight: weight.to_i, source: source, reindex_on: reindex_on&.to_s, async: async, as: as&.to_s, version: version)
     end
 
     def exact_match(name, source: -> { public_send(name) }, version: nil)
-      raise InvalidFieldError, "Duplicate exact_match name: #{name.inspect}" if name_taken?(name)
       unless valid_name?(name)
         raise InvalidFieldError, "Invalid exact_match name: #{name.inspect}"
       end
-      @exact_matches << ExactMatch.new(name: name.to_s, source: source, version: version)
+      str = name.to_s
+      raise InvalidFieldError, "Duplicate exact_match name: #{name.inspect}" if exact_matches.any? { |e| e.name == str }
+      @exact_matches << ExactMatch.new(name: str, source: source, version: version)
     end
 
     def rank_by(column, direction = :desc)
-      raise InvalidFieldError, "Duplicate rank_by column: #{column.inspect}" if name_taken?(column)
       unless valid_name?(column)
         raise InvalidFieldError, "Invalid rank_by column: #{column.inspect}"
       end
-      @rank_bys << RankBy.new(column: column.to_s, direction: direction.to_sym)
+      str = column.to_s
+      raise InvalidFieldError, "Duplicate rank_by column: #{column.inspect}" if rank_bys.any? { |r| r.column == str }
+      @rank_bys << RankBy.new(column: str, direction: direction.to_sym)
     end
 
     def filter(name, required: false)
-      raise InvalidFieldError, "Duplicate filter name: #{name.inspect}" if name_taken?(name)
       unless valid_name?(name)
         raise InvalidFieldError, "Invalid filter name: #{name.inspect}"
       end
-      @filters << Filter.new(name: name.to_s, required: required)
+      str = name.to_s
+      raise InvalidFieldError, "Duplicate filter name: #{name.inspect}" if filters.any? { |f| f.name == str }
+      raise InvalidFieldError, "Filter name conflicts with field: #{name.inspect}" if fields.any? { |f| f.name == str }
+      @filters << Filter.new(name: str, required: required)
     end
 
     def soft_delete_column(name = :_no_arg_)
@@ -108,12 +114,5 @@ module FullSearch
       name.to_s.match?(/\A[a-zA-Z_]\w*\z/)
     end
 
-    def name_taken?(name)
-      str = name.to_s
-      fields.any? { |f| f.name == str } ||
-        filters.any? { |f| f.name == str } ||
-        exact_matches.any? { |e| e.name == str } ||
-        rank_bys.any? { |r| r.column == str }
-    end
   end
 end
