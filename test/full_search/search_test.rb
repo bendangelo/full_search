@@ -97,4 +97,35 @@ class FullSearch::SearchTest < ActiveSupport::TestCase
       @customer_model.full_search("Sam", filters: {})
     end
   end
+
+  def test_offset_and_limit
+    account = Account.create!(name: "Acme")
+    5.times { |i| @customer_model.create!(account_id: account.id, first_name: "Person #{i}") }
+    FullSearch::Index.rebuild!(@customer_model)
+
+    first_page = @customer_model.full_search("Person", filters: { account_id: account.id }, limit: 2, offset: 0)
+    assert_equal 2, first_page.size
+
+    second_page = @customer_model.full_search("Person", filters: { account_id: account.id }, limit: 2, offset: 2)
+    assert_equal 2, second_page.size
+  end
+
+  def test_empty_query_returns_none
+    account = Account.create!(name: "Acme")
+    @customer_model.create!(account_id: account.id, first_name: "Sam")
+    FullSearch::Index.rebuild!(@customer_model)
+
+    results = @customer_model.full_search("", filters: { account_id: account.id })
+    assert_equal 0, results.size
+    assert_kind_of ActiveRecord::Relation, results
+  end
+
+  def test_highlight_returns_array
+    account = Account.create!(name: "Acme")
+    @customer_model.create!(account_id: account.id, first_name: "Sam")
+    FullSearch::Index.rebuild!(@customer_model)
+
+    results = @customer_model.full_search("Sam", filters: { account_id: account.id }, highlight: true)
+    assert_kind_of Array, results
+  end
 end

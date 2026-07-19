@@ -29,6 +29,42 @@ class FullSearch::HighlighterTest < ActiveSupport::TestCase
     assert result.full_search_snippet.include?("<mark>")
   end
 
+  def test_custom_highlight_tags
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name, weight: 5
+        highlight open_tag: "[", close_tag: "]"
+        filter :account_id, required: true
+      end
+    end
+    model.table_name = "customers"
+    account = Account.create!(name: "Acme")
+    model.create!(account_id: account.id, first_name: "Samantha")
+    FullSearch::Index.rebuild!(model)
+
+    results = model.full_search("Samantha", filters: { account_id: account.id }, highlight: true).to_a
+    result = results.first
+    assert_includes result.full_search_snippet, "[Samantha]"
+  end
+
+  def test_highlight_fields_with_custom_tags
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name, weight: 5
+        highlight open_tag: "**", close_tag: "**"
+        filter :account_id, required: true
+      end
+    end
+    model.table_name = "customers"
+    account = Account.create!(name: "Acme")
+    model.create!(account_id: account.id, first_name: "Samantha")
+    FullSearch::Index.rebuild!(model)
+
+    results = model.full_search("Samantha", filters: { account_id: account.id }, highlight_fields: true).to_a
+    result = results.first
+    assert_includes result.full_search_highlight_fields["first_name"], "**Samantha**"
+  end
+
   def test_snippet_with_short_prefix_via_like_fallback
     model = Class.new(Customer) do
       full_search do

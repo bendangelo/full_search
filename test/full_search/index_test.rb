@@ -56,4 +56,20 @@ class FullSearch::IndexTest < ActiveSupport::TestCase
     )
     assert_equal 1, rows.count
   end
+
+  def test_drop_removes_fts_table
+    FullSearch::Index.ensure_table!(@model)
+    assert FullSearch::Index.send(:table_exists?, @model)
+
+    FullSearch::Index.drop!(@model)
+    refute FullSearch::Index.send(:table_exists?, @model)
+  end
+
+  def test_ensure_table_is_idempotent
+    FullSearch::Index.ensure_table!(@model)
+    assert FullSearch::Index.send(:table_exists?, @model)
+
+    FullSearch::Index.ensure_table!(@model)
+    assert FullSearch::Index.send(:table_exists?, @model)
+  end
 end
