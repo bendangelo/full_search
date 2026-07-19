@@ -3,8 +3,7 @@
 module FullSearch
   module Callbacks
     def self.install!(model)
-      return if model.instance_variable_defined?(:@__full_search_callbacks_installed) &&
-                model.instance_variable_get(:@__full_search_callbacks_installed)
+      return if model.instance_variable_get(:@__full_search_callbacks_installed)
 
       dsl = model.full_search_dsl
 
@@ -34,7 +33,7 @@ module FullSearch
       model.instance_variable_set(:@__full_search_callbacks_installed, true)
     end
 
-    def self.uninstall!(model)
+    def self.reset_installed_flag!(model)
       model.instance_variable_set(:@__full_search_callbacks_installed, false)
     end
 

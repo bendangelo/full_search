@@ -32,18 +32,44 @@ class FullSearch::CallbacksTest < ActiveSupport::TestCase
     model.table_name = "vehicles"
     FullSearch::Index.rebuild!(model)
 
-    save_callbacks = model._save_callbacks.to_a.dup
-    destroy_callbacks = model._destroy_callbacks.to_a.dup
+    save_count = model._save_callbacks.to_a.size
+    destroy_count = model._destroy_callbacks.to_a.size
 
     model.full_search do
       field :computed, source: -> { make&.upcase }
       filter :account_id, required: true
     end
 
-    assert_equal save_callbacks.size, model._save_callbacks.to_a.size
-    assert_equal destroy_callbacks.size, model._destroy_callbacks.to_a.size
+    assert_equal save_count, model._save_callbacks.to_a.size
+    assert_equal destroy_count, model._destroy_callbacks.to_a.size
   ensure
-    FullSearch::Callbacks.uninstall!(model)
+    FullSearch::Callbacks.reset_installed_flag!(model)
+    FullSearch::Index.drop!(model) rescue nil
+  end
+
+  def test_callbacks_still_fire_after_reopening_dsl
+    account = Account.create!(name: "Acme")
+    model = Class.new(Vehicle) do
+      full_search do
+        field :computed, source: -> { make&.upcase }
+        filter :account_id, required: true
+      end
+    end
+    model.table_name = "vehicles"
+    FullSearch::Index.rebuild!(model)
+
+    model.full_search do
+      field :computed, source: -> { make&.upcase }
+      filter :account_id, required: true
+    end
+
+    vehicle = model.create!(account_id: account.id, make: "Honda")
+    row = ActiveRecord::Base.connection.execute(
+      "SELECT computed FROM #{FullSearch::Index.fts_table_name(model)} WHERE rowid = #{vehicle.id}"
+    ).first
+    assert_equal "HONDA", row["computed"]
+  ensure
+    FullSearch::Callbacks.reset_installed_flag!(model)
     FullSearch::Index.drop!(model) rescue nil
   end
 
