@@ -16,7 +16,12 @@ module FullSearch
       if fields.empty? && records.any?
         fields = manual_field_snippets(records, model, query)
       end
-      records.each { |record| record.full_search_highlight_fields = fields[record.id] || {} }
+      exact_fields = exact_match_field_snippets(records, model, query)
+      records.each do |record|
+        merged = fields[record.id] || {}
+        exact_fields.fetch(record.id, {}).each { |k, v| merged[k] ||= v }
+        record.full_search_highlight_fields = merged
+      end
       records
     end
 
@@ -71,6 +76,30 @@ module FullSearch
           hash[col.to_s] = highlighted if highlighted.include?(config[:open_tag])
         end
         [record.id, snippets]
+      end
+    end
+
+    def self.exact_match_field_snippets(records, model, query)
+      dsl = model.full_search_dsl
+      return {} if dsl.exact_matches.empty?
+
+      config = dsl.highlight_config || { open_tag: "<mark>", close_tag: "</mark>" }
+
+      records.to_h do |record|
+        snippets = dsl.exact_matches.each_with_object({}) do |em, hash|
+          value = exact_match_field_value(em, record)
+          highlighted = manual_highlight(value.to_s, query, config)
+          hash[em.name.to_s] = highlighted if highlighted.include?(config[:open_tag])
+        end
+        [record.id, snippets]
+      end
+    end
+
+    def self.exact_match_field_value(em, record)
+      if em.source
+        record.instance_exec(&em.source)
+      else
+        record.public_send(em.name)
       end
     end
 
