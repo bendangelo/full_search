@@ -5,7 +5,8 @@ def resolve_full_search_models(args)
     args[:models].split(",").map do |name|
       klass = begin
         name.singularize.camelize.constantize
-      rescue
+      rescue NameError, LoadError => e
+        warn "[full_search] Could not resolve model '#{name}': #{e.message}"
         nil
       end
       klass || FullSearch.models.find { |m| m.table_name == name }

@@ -98,11 +98,7 @@ module FullSearch
       match_expr = QueryParser.to_match_expression(parsed)
       return [] if match_expr.empty?
 
-      term = begin
-        parsed.last
-      rescue
-        nil
-      end
+      term = parsed.last
       return [] if term.nil?
 
       if term.length < dsl.typo_tolerance_min_term_length.to_i
@@ -181,11 +177,7 @@ module FullSearch
     end
 
     def fuzzy_match_ids(parsed)
-      term = begin
-        parsed.last
-      rescue
-        nil
-      end
+      term = parsed.last
       return [] if term.nil?
 
       term_str = term.is_a?(Array) ? extract_last_term_string(term) : term.to_s
@@ -307,7 +299,7 @@ module FullSearch
 
     def connection
       model.connection
-    rescue
+    rescue NoMethodError
       ActiveRecord::Base.connection
     end
 
