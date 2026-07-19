@@ -15,7 +15,7 @@ module FullSearch
   class Index
     class << self
       def ensure_table!(model)
-        return unless FullSearch::Index.sqlite?
+        sqlite!(model)
 
         conn = connection
         dsl = model.full_search_dsl
@@ -31,7 +31,7 @@ module FullSearch
 
         trigram_was_created = false
         if dsl.typo_tolerance? && !trigram_table_exists?(model)
-          FullSearch::Typo.warn_unsupported! unless FullSearch::Typo.supported?
+          FullSearch::Typo.warn_unsupported!(model) unless FullSearch::Typo.supported?(model)
           conn.execute(create_trigram_virtual_table_sql(model))
           trigram_was_created = true
         end
@@ -47,7 +47,7 @@ module FullSearch
       end
 
       def rebuild!(model)
-        return unless FullSearch::Index.sqlite?
+        sqlite!(model)
 
         dsl = model.full_search_dsl
         return unless dsl
@@ -61,7 +61,7 @@ module FullSearch
           conn.execute("DROP TABLE IF EXISTS #{qt(trigram_table_name(model))};")
           conn.execute(create_virtual_table_sql(model))
           if dsl.typo_tolerance?
-            FullSearch::Typo.warn_unsupported! unless FullSearch::Typo.supported?
+            FullSearch::Typo.warn_unsupported!(model) unless FullSearch::Typo.supported?(model)
             conn.execute(create_trigram_virtual_table_sql(model))
           end
           conn.execute(backfill_sql(model))
@@ -74,7 +74,7 @@ module FullSearch
       end
 
       def rebuild_if_needed!(model)
-        return false unless FullSearch::Index.sqlite?
+        sqlite!(model)
 
         dsl = model.full_search_dsl
         return false unless dsl
@@ -92,6 +92,7 @@ module FullSearch
       end
 
       def optimize!(model)
+        sqlite!(model)
         connection.execute("INSERT INTO #{qt(fts_table_name(model))}(#{qt(fts_table_name(model))}) VALUES('optimize');")
       end
 
@@ -102,6 +103,7 @@ module FullSearch
       end
 
       def drop!(model)
+        sqlite!(model)
         drop_triggers!(model)
         connection.execute("DROP TABLE IF EXISTS #{qt(fts_table_name(model))};")
         connection.execute("DROP TABLE IF EXISTS #{qt(trigram_table_name(model))};")
@@ -115,8 +117,19 @@ module FullSearch
         "#{fts_table_name(model)}_trigram"
       end
 
-      def sqlite?
+      def sqlite?(model = nil)
+        if model
+          model.connection.adapter_name.downcase.include?("sqlite")
+        else
+          connection.adapter_name.downcase.include?("sqlite")
+        end
+      rescue
         connection.adapter_name.downcase.include?("sqlite")
+      end
+
+      def sqlite!(model)
+        adapter = model ? model.connection.adapter_name : connection.adapter_name
+        raise UnsupportedDatabaseError, "full_search requires SQLite, but #{adapter} is configured" unless sqlite?(model)
       end
 
       def stored_config_hash(model)
