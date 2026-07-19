@@ -29,6 +29,7 @@ class FullSearch::EdgeCaseTest < ActiveSupport::TestCase
       end
     end
     model.table_name = "customers"
+    FullSearch::Index.rebuild!(model)
 
     assert_raises(FullSearch::InvalidQueryError) do
       model.full_search("a" * 500, filters: {account_id: 1})
@@ -43,6 +44,7 @@ class FullSearch::EdgeCaseTest < ActiveSupport::TestCase
       end
     end
     model.table_name = "customers"
+    FullSearch::Index.rebuild!(model)
 
     assert_raises(FullSearch::InvalidQueryError) do
       model.full_search("foo\0bar", filters: {account_id: 1})
