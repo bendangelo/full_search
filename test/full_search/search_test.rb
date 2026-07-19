@@ -191,6 +191,33 @@ class FullSearch::SearchTest < ActiveSupport::TestCase
     FullSearch.config.stale_query_behavior = original_behavior
   end
 
+  def test_stale_config_auto_rebuilds_when_configured
+    original = FullSearch.config.auto_rebuild_on_stale_query
+    FullSearch.config.auto_rebuild_on_stale_query = true
+
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name
+        filter :account_id, required: true
+      end
+    end
+    model.table_name = "customers"
+    account = Account.create!(name: "Acme")
+    customer = model.create!(account_id: account.id, first_name: "Sam")
+    FullSearch::Index.rebuild!(model)
+
+    ActiveRecord::Base.connection.execute(
+      "UPDATE full_search_index_versions SET config_hash = 'fakehash' WHERE table_name = 'customers'"
+    )
+
+    assert_nothing_raised do
+      results = model.full_search("Sam", filters: {account_id: account.id})
+      assert_includes results.to_a, customer
+    end
+  ensure
+    FullSearch.config.auto_rebuild_on_stale_query = original
+  end
+
   def test_no_stored_config_does_not_raise
     ActiveRecord::Base.connection.execute(
       "DELETE FROM full_search_index_versions WHERE table_name = 'customers'"

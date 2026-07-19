@@ -76,13 +76,18 @@ module FullSearch
       stored = FullSearch::Index.stored_config_hash(model)
       return unless stored
 
-      if stored != dsl.config_hash
-        case FullSearch.config.stale_query_behavior
-        when :raise
-          raise ConfigChangedError, "FTS index for #{model.table_name} is stale; run full_search:rebuild"
-        when :log_and_fallback
-          Rails.logger.warn("[full_search] FTS index for #{model.table_name} is stale; results may be incomplete")
-        end
+      return if stored == dsl.config_hash
+
+      if FullSearch.config.auto_rebuild_on_stale_query
+        FullSearch::Index.rebuild_if_needed!(model)
+        return
+      end
+
+      case FullSearch.config.stale_query_behavior
+      when :raise
+        raise ConfigChangedError, "FTS index for #{model.table_name} is stale; run full_search:rebuild"
+      when :log_and_fallback
+        Rails.logger.warn("[full_search] FTS index for #{model.table_name} is stale; results may be incomplete")
       end
     end
 
