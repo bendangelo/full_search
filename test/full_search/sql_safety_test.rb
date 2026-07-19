@@ -23,7 +23,7 @@ class FullSearch::SqlSafetyTest < ActiveSupport::TestCase
     @model.create!(account_id: account.id, first_name: "Sam")
     FullSearch::Index.rebuild!(@model)
 
-    assert_raises(FullSearch::MissingRequiredFilterError) do
+    assert_raises(FullSearch::UnknownFilterError) do
       @model.full_search("Sam", filters: {"account_id; DROP TABLE customers; --" => account.id})
     end
   end

@@ -59,7 +59,7 @@ module FullSearch
       allowed = dsl.filters.map(&:name).to_set
       filters.each_key do |key|
         unless allowed.include?(key.to_s)
-          raise MissingRequiredFilterError, "Unknown filter: #{key}"
+          raise UnknownFilterError, "Unknown filter: #{key}"
         end
       end
     end
