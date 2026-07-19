@@ -1,6 +1,14 @@
 # full_search
 
+[![CI](https://github.com/bendangelo/full_search/actions/workflows/ci.yml/badge.svg)](https://github.com/bendangelo/full_search/actions/workflows/ci.yml)
+
 SQLite FTS5 full-text search for Rails/ActiveRecord. A lightweight, self-contained alternative to `pg_search` for apps already running on SQLite.
+
+## Requirements
+
+- Ruby 3.1+
+- Rails 8.0+
+- SQLite 3.34+ (if using typo tolerance)
 
 ## When to use
 
