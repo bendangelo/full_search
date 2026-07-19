@@ -4,6 +4,9 @@ require "minitest/autorun"
 require "active_record"
 require "full_search"
 
+module Rails
+end
+
 ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: ":memory:")
 
 ActiveRecord::Encryption.configure(
