@@ -73,7 +73,7 @@ class FullSearch::SearchTest < ActiveSupport::TestCase
     assert_includes results.to_a, customer
   end
 
-  def test_short_prefix_with_trigram_tokenizer_returns_empty
+  def test_short_prefix_with_trigram_tokenizer_and_typo_tolerance
     account = Account.create!(name: "Acme")
     model = Class.new(Customer) do
       full_search do
@@ -89,7 +89,8 @@ class FullSearch::SearchTest < ActiveSupport::TestCase
     FullSearch::Index.rebuild!(model)
 
     results = model.full_search("sa", filters: { account_id: account.id })
-    assert_empty results
+    assert_not_empty results
+    assert_equal "Sarah", results.first.first_name
   end
 
   def test_missing_required_filter_raises

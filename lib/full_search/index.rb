@@ -14,21 +14,22 @@ module FullSearch
 
         create_metadata_table!
 
-        table_was_created = false
+        fts_was_created = false
         unless table_exists?(model)
           conn.execute(create_virtual_table_sql(model))
-          table_was_created = true
+          fts_was_created = true
         end
 
+        trigram_was_created = false
         if dsl.typo_tolerance? && !trigram_table_exists?(model)
           FullSearch::Typo.warn_unsupported! unless FullSearch::Typo.supported?
           conn.execute(create_trigram_virtual_table_sql(model))
-          table_was_created = true
+          trigram_was_created = true
         end
 
-        if table_was_created
-          conn.execute(backfill_sql(model))
-          conn.execute(backfill_trigram_sql(model)) if dsl.typo_tolerance?
+        if fts_was_created || trigram_was_created
+          conn.execute(backfill_sql(model)) if fts_was_created
+          conn.execute(backfill_trigram_sql(model)) if trigram_was_created
           reindex_source_fields!(model) if dsl.fields.any?(&:source)
           store_config_hash!(model)
         end

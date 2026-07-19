@@ -21,7 +21,7 @@ module FullSearch
     def relation
       validate_required_filters!
 
-      return model.none if dsl.tokenize == "trigram" && query.length < MIN_TERM_LENGTH
+      return model.none if dsl.tokenize == "trigram" && query.length < MIN_TERM_LENGTH && !dsl.typo_tolerance?
 
       parsed = QueryParser.parse(query)
       exact_ids = ExactMatch.ids_for(model, query, filters)
