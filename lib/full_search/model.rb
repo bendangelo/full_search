@@ -13,6 +13,7 @@ module FullSearch
           FullSearch::Index.ensure_table!(self)
           FullSearch::Callbacks.install!(self)
           include InstanceMethods
+
           FullSearch.register_model(self)
           @full_search_dsl
         else

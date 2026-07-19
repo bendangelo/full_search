@@ -36,19 +36,27 @@ class WenmarParityTest < ActiveSupport::TestCase
   end
 
   def teardown
-    FullSearch::Index.drop!(@customer_model) rescue nil
-    FullSearch::Index.drop!(@vehicle_model) rescue nil
+    begin
+      FullSearch::Index.drop!(@customer_model)
+    rescue
+      nil
+    end
+    begin
+      FullSearch::Index.drop!(@vehicle_model)
+    rescue
+      nil
+    end
   end
 
   def test_customer_prefix_search
     customer = @customer_model.create!(account_id: @account.id, first_name: "Samantha", last_name: "Smith")
-    results = @customer_model.full_search("Samantha", filters: { account_id: @account.id })
+    results = @customer_model.full_search("Samantha", filters: {account_id: @account.id})
     assert_includes results.to_a, customer
   end
 
   def test_vehicle_exact_vin_search
     vehicle = @vehicle_model.create!(account_id: @account.id, vin: "1HGCM82633A004352")
-    results = @vehicle_model.full_search("1HGCM82633A004352", filters: { account_id: @account.id })
+    results = @vehicle_model.full_search("1HGCM82633A004352", filters: {account_id: @account.id})
     assert_includes results.to_a, vehicle
   end
 

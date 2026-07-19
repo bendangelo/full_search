@@ -2,7 +2,7 @@
 
 module FullSearch
   class Dsl
-    attr_reader :fields, :exact_matches, :filters, :model_class, :tokenize, :highlight_config, :rank_bys
+    attr_reader :fields, :exact_matches, :filters, :model_class, :highlight_config, :rank_bys
 
     Field = Data.define(:name, :weight, :source, :reindex_on, :async, :as, :version)
     ExactMatch = Data.define(:name, :source, :version)
@@ -77,7 +77,7 @@ module FullSearch
     end
 
     def highlight(open_tag: "<mark>", close_tag: "</mark>")
-      @highlight_config = { open_tag: open_tag, close_tag: close_tag }
+      @highlight_config = {open_tag: open_tag, close_tag: close_tag}
     end
 
     def typo_tolerance(enabled = true, min_term_length: nil)
@@ -113,6 +113,5 @@ module FullSearch
     def valid_name?(name)
       name.to_s.match?(/\A[a-zA-Z_]\w*\z/)
     end
-
   end
 end

@@ -43,7 +43,7 @@ module FullSearch
         )
       end
 
-      { groups: searched, total_count: searched.sum { |g| g[:total_count] } }
+      {groups: searched, total_count: searched.sum { |g| g[:total_count] }}
     end
 
     private

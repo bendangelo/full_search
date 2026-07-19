@@ -12,7 +12,11 @@ class FullSearch::IndexTest < ActiveSupport::TestCase
       end
     end
     @model.table_name = "customers"
-    FullSearch::Index.drop!(@model) rescue nil
+    begin
+      FullSearch::Index.drop!(@model)
+    rescue
+      nil
+    end
   end
 
   def teardown
@@ -48,7 +52,7 @@ class FullSearch::IndexTest < ActiveSupport::TestCase
 
   def test_rebuild_populates_rows
     account = Account.create!(name: "Acme")
-    customer = @model.create!(account_id: account.id, first_name: "Sam", last_name: "Smith")
+    @model.create!(account_id: account.id, first_name: "Sam", last_name: "Smith")
     FullSearch::Index.rebuild!(@model)
 
     rows = ActiveRecord::Base.connection.execute(

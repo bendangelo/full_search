@@ -24,7 +24,7 @@ class FullSearch::RankByTest < ActiveSupport::TestCase
     new_record = @model.create!(account_id: @account.id, first_name: "Sam", updated_at: 1.hour.ago)
     FullSearch::Index.rebuild!(@model)
 
-    results = @model.full_search("Sam", filters: { account_id: @account.id }).to_a
+    results = @model.full_search("Sam", filters: {account_id: @account.id}).to_a
     assert_equal [new_record, old_record], results
   end
 
@@ -40,10 +40,10 @@ class FullSearch::RankByTest < ActiveSupport::TestCase
     @model.table_name = "customers"
 
     exact = @model.create!(account_id: @account.id, first_name: "ExactSam", updated_at: 1.day.ago)
-    partial = @model.create!(account_id: @account.id, first_name: "Samuel", updated_at: 1.hour.ago)
+    @model.create!(account_id: @account.id, first_name: "Samuel", updated_at: 1.hour.ago)
     FullSearch::Index.rebuild!(@model)
 
-    results = @model.full_search("ExactSam", filters: { account_id: @account.id }).to_a
+    results = @model.full_search("ExactSam", filters: {account_id: @account.id}).to_a
     assert_equal exact, results.first
   end
 end

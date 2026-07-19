@@ -17,7 +17,11 @@ class FullSearch::SoftDeleteTest < ActiveSupport::TestCase
 
   def teardown
     Customer.delete_all
-    FullSearch::Index.drop!(@model) rescue nil
+    begin
+      FullSearch::Index.drop!(@model)
+    rescue
+      nil
+    end
   end
 
   def test_soft_deleted_record_excluded_from_search
@@ -25,11 +29,11 @@ class FullSearch::SoftDeleteTest < ActiveSupport::TestCase
     customer = @model.create!(account_id: account.id, first_name: "Sam")
     FullSearch::Index.rebuild!(@model)
 
-    results = @model.full_search("Sam", filters: { account_id: account.id })
+    results = @model.full_search("Sam", filters: {account_id: account.id})
     assert_includes results.to_a, customer
 
     customer.update!(discarded_at: Time.current)
-    results = @model.full_search("Sam", filters: { account_id: account.id })
+    results = @model.full_search("Sam", filters: {account_id: account.id})
     refute_includes results.to_a, customer
   end
 
@@ -38,7 +42,7 @@ class FullSearch::SoftDeleteTest < ActiveSupport::TestCase
     customer = @model.create!(account_id: account.id, first_name: "Sam", discarded_at: Time.current)
     FullSearch::Index.rebuild!(@model)
 
-    results = @model.full_search("Sam", filters: { account_id: account.id }, include_soft_deleted: true)
+    results = @model.full_search("Sam", filters: {account_id: account.id}, include_soft_deleted: true)
     assert_includes results.to_a, customer
   end
 
@@ -62,7 +66,7 @@ class FullSearch::SoftDeleteTest < ActiveSupport::TestCase
 
     customer.update!(discarded_at: nil)
 
-    results = @model.full_search("Sam", filters: { account_id: account.id })
+    results = @model.full_search("Sam", filters: {account_id: account.id})
     assert_includes results.to_a, customer
   end
 
@@ -85,7 +89,7 @@ class FullSearch::SoftDeleteTest < ActiveSupport::TestCase
     model.create!(account_id: account.id, first_name: "Samantha", last_name: "Smith", discarded_at: Time.current)
 
     # 2-char query forces like_prefix_ids fallback (trigram requires 3+ chars)
-    results = model.full_search("sa", filters: { account_id: account.id })
+    results = model.full_search("sa", filters: {account_id: account.id})
     assert_equal 1, results.size
     assert_equal good.id, results.first.id
   end
@@ -102,15 +106,15 @@ class FullSearch::SoftDeleteTest < ActiveSupport::TestCase
     FullSearch::Index.rebuild!(vehicle_model)
 
     vehicle = vehicle_model.create!(account_id: account.id, make: "Honda")
-    results = vehicle_model.full_search("Honda", filters: { account_id: account.id })
+    results = vehicle_model.full_search("Honda", filters: {account_id: account.id})
     assert_includes results.to_a, vehicle
 
     vehicle.update!(make: "Toyota")
-    results = vehicle_model.full_search("Toyota", filters: { account_id: account.id })
+    results = vehicle_model.full_search("Toyota", filters: {account_id: account.id})
     assert_includes results.to_a, vehicle
 
     vehicle.destroy!
-    results = vehicle_model.full_search("Toyota", filters: { account_id: account.id })
+    results = vehicle_model.full_search("Toyota", filters: {account_id: account.id})
     refute_includes results.to_a, vehicle
   end
 end

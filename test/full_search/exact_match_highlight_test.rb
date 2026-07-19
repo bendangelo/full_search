@@ -9,7 +9,11 @@ class FullSearch::ExactMatchHighlightTest < ActiveSupport::TestCase
   end
 
   def teardown
-    FullSearch::Index.drop!(@model) rescue nil
+    begin
+      FullSearch::Index.drop!(@model)
+    rescue
+      nil
+    end
     Customer.delete_all
     Account.delete_all
     clean_fts_tables!
@@ -29,7 +33,7 @@ class FullSearch::ExactMatchHighlightTest < ActiveSupport::TestCase
     @model.create!(account_id: @account.id, first_name: "Sam", company_name: "ABC Corp")
     FullSearch::Index.rebuild!(@model)
 
-    results = @model.full_search("ABC Corp", filters: { account_id: @account.id }, highlight_fields: true).to_a
+    results = @model.full_search("ABC Corp", filters: {account_id: @account.id}, highlight_fields: true).to_a
     refute results.empty?
     result = results.first
 
@@ -51,7 +55,7 @@ class FullSearch::ExactMatchHighlightTest < ActiveSupport::TestCase
     @model.create!(account_id: @account.id, first_name: "Sam", company_name: "ABC CORP")
     FullSearch::Index.rebuild!(@model)
 
-    results = @model.full_search("abc corp", filters: { account_id: @account.id }, highlight_fields: true).to_a
+    results = @model.full_search("abc corp", filters: {account_id: @account.id}, highlight_fields: true).to_a
     refute results.empty?
     result = results.first
 
@@ -63,10 +67,10 @@ class FullSearch::ExactMatchHighlightTest < ActiveSupport::TestCase
   def clean_fts_tables!
     ActiveRecord::Base.connection.execute(
       "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE '%_fts%'"
-    ).each { |r| ActiveRecord::Base.connection.execute("DROP TRIGGER IF EXISTS #{r['name']}") }
+    ).each { |r| ActiveRecord::Base.connection.execute("DROP TRIGGER IF EXISTS #{r["name"]}") }
     ActiveRecord::Base.connection.execute(
       "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%_fts%'"
-    ).each { |r| ActiveRecord::Base.connection.execute("DROP TABLE IF EXISTS #{r['name']}") }
+    ).each { |r| ActiveRecord::Base.connection.execute("DROP TABLE IF EXISTS #{r["name"]}") }
     ActiveRecord::Base.connection.execute("DROP TABLE IF EXISTS full_search_index_versions")
   end
 end

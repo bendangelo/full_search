@@ -19,7 +19,11 @@ class FullSearch::CallbacksTest < ActiveSupport::TestCase
   def teardown
     Customer.delete_all
     Vehicle.delete_all
-    FullSearch::Index.drop!(@vehicle_model) rescue nil
+    begin
+      FullSearch::Index.drop!(@vehicle_model)
+    rescue
+      nil
+    end
   end
 
   def test_callbacks_are_idempotent
@@ -40,7 +44,11 @@ class FullSearch::CallbacksTest < ActiveSupport::TestCase
     assert_equal save_count, model._save_callbacks.to_a.size
     assert_equal destroy_count, model._destroy_callbacks.to_a.size
   ensure
-    FullSearch::Index.drop!(model) rescue nil
+    begin
+      FullSearch::Index.drop!(model)
+    rescue
+      nil
+    end
   end
 
   def test_callbacks_still_fire_after_reopening_dsl
@@ -60,7 +68,11 @@ class FullSearch::CallbacksTest < ActiveSupport::TestCase
     ).first
     assert_equal "HONDA", row["computed"]
   ensure
-    FullSearch::Index.drop!(model) rescue nil
+    begin
+      FullSearch::Index.drop!(model)
+    rescue
+      nil
+    end
   end
 
   def test_source_field_syncs_on_save

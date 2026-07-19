@@ -24,7 +24,7 @@ class FullSearch::SearchOperatorsTest < ActiveSupport::TestCase
     customer = @model.create!(account_id: @account.id, first_name: "Samantha Jones", last_name: "")
     FullSearch::Index.rebuild!(@model)
 
-    results = @model.full_search('"Samantha Jones"', filters: { account_id: @account.id })
+    results = @model.full_search('"Samantha Jones"', filters: {account_id: @account.id})
     assert_includes results.to_a, customer
   end
 
@@ -33,7 +33,7 @@ class FullSearch::SearchOperatorsTest < ActiveSupport::TestCase
     cam = @model.create!(account_id: @account.id, first_name: "Cam", last_name: "Smith")
     FullSearch::Index.rebuild!(@model)
 
-    results = @model.full_search("Smith -Cam", filters: { account_id: @account.id })
+    results = @model.full_search("Smith -Cam", filters: {account_id: @account.id})
     assert_includes results.to_a, sam
     refute_includes results.to_a, cam
   end
@@ -43,7 +43,7 @@ class FullSearch::SearchOperatorsTest < ActiveSupport::TestCase
     jane = @model.create!(account_id: @account.id, first_name: "Jane")
     FullSearch::Index.rebuild!(@model)
 
-    results = @model.full_search("Sam OR Jane", filters: { account_id: @account.id })
+    results = @model.full_search("Sam OR Jane", filters: {account_id: @account.id})
     assert_includes results.to_a, sam
     assert_includes results.to_a, jane
   end

@@ -25,7 +25,7 @@ class FullSearch::ExactMatchTest < ActiveSupport::TestCase
 
     vehicle = Vehicle.create!(account_id: @account.id, make: "HONDA")
 
-    ids = FullSearch::ExactMatch.ids_for(search_model, "honda", { account_id: @account.id })
+    ids = FullSearch::ExactMatch.ids_for(search_model, "honda", {account_id: @account.id})
     assert_includes ids, vehicle.id
   end
 
@@ -42,7 +42,7 @@ class FullSearch::ExactMatchTest < ActiveSupport::TestCase
 
     vehicle = Vehicle.create!(account_id: @account.id, make: "Honda")
 
-    ids = FullSearch::ExactMatch.ids_for(search_model, "Honda", { account_id: @account.id })
+    ids = FullSearch::ExactMatch.ids_for(search_model, "Honda", {account_id: @account.id})
     assert_includes ids, vehicle.id
   end
 
@@ -58,7 +58,7 @@ class FullSearch::ExactMatchTest < ActiveSupport::TestCase
     FullSearch::Index.rebuild!(search_model)
     vehicle = Vehicle.create!(account_id: @account.id, make: "Honda", license_plate: "ABC-123")
 
-    ids = FullSearch::ExactMatch.ids_for(search_model, "Honda", { account_id: @account.id })
+    ids = FullSearch::ExactMatch.ids_for(search_model, "Honda", {account_id: @account.id})
     assert_includes ids, vehicle.id
   end
 
@@ -75,7 +75,7 @@ class FullSearch::ExactMatchTest < ActiveSupport::TestCase
 
     vehicle = Vehicle.create!(account_id: @account.id, license_plate: "ABC-1234")
 
-    ids = FullSearch::ExactMatch.ids_for(search_model, "ABC-1234", { account_id: @account.id })
+    ids = FullSearch::ExactMatch.ids_for(search_model, "ABC-1234", {account_id: @account.id})
     assert_includes ids, vehicle.id
   end
 end

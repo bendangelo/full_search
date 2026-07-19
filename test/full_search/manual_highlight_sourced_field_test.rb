@@ -22,20 +22,24 @@ class FullSearch::ManualHighlightSourcedFieldTest < ActiveSupport::TestCase
   end
 
   def teardown
-    FullSearch::Index.drop!(@model) rescue nil
+    begin
+      FullSearch::Index.drop!(@model)
+    rescue
+      nil
+    end
     Customer.delete_all
     Account.delete_all
   end
 
   def test_manual_field_highlight_respects_sourced_fields
-    customer = @model.create!(account_id: @account.id, first_name: "", code: "XYZ")
+    @model.create!(account_id: @account.id, first_name: "", code: "XYZ")
     FullSearch::Index.rebuild!(@model)
 
     # Force the manual highlight fallback:
     # ExactMatch finds the record via code, but the FTS table has empty first_name
     # and empty tag_names (backfilled '' for sourced fields), so build_field_snippets
     # returns nothing and manual_field_snippets is called.
-    results = @model.full_search("XYZ", filters: { account_id: @account.id }, highlight_fields: true).to_a
+    results = @model.full_search("XYZ", filters: {account_id: @account.id}, highlight_fields: true).to_a
     refute results.empty?, "Expected the exact-match search to find at least one record"
     result = results.first
 
@@ -48,10 +52,10 @@ class FullSearch::ManualHighlightSourcedFieldTest < ActiveSupport::TestCase
   end
 
   def test_manual_highlight_with_source_proc
-    customer = @model.create!(account_id: @account.id, first_name: "Alice", code: "ABC")
+    @model.create!(account_id: @account.id, first_name: "Alice", code: "ABC")
     FullSearch::Index.rebuild!(@model)
 
-    results = @model.full_search("ABC", filters: { account_id: @account.id }, highlight_fields: true).to_a
+    results = @model.full_search("ABC", filters: {account_id: @account.id}, highlight_fields: true).to_a
     refute results.empty?
     result = results.first
 
@@ -68,10 +72,10 @@ class FullSearch::ManualHighlightSourcedFieldTest < ActiveSupport::TestCase
   def clean_fts_tables!
     ActiveRecord::Base.connection.execute(
       "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE '%_fts%'"
-    ).each { |r| ActiveRecord::Base.connection.execute("DROP TRIGGER IF EXISTS #{r['name']}") }
+    ).each { |r| ActiveRecord::Base.connection.execute("DROP TRIGGER IF EXISTS #{r["name"]}") }
     ActiveRecord::Base.connection.execute(
       "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%_fts%'"
-    ).each { |r| ActiveRecord::Base.connection.execute("DROP TABLE IF EXISTS #{r['name']}") }
+    ).each { |r| ActiveRecord::Base.connection.execute("DROP TABLE IF EXISTS #{r["name"]}") }
     ActiveRecord::Base.connection.execute("DROP TABLE IF EXISTS full_search_index_versions")
   end
 

@@ -3,7 +3,11 @@
 def resolve_full_search_models(args)
   if args[:models]
     args[:models].split(",").map do |name|
-      klass = name.singularize.camelize.constantize rescue nil
+      klass = begin
+        name.singularize.camelize.constantize
+      rescue
+        nil
+      end
       klass || FullSearch.models.find { |m| m.table_name == name }
     end.compact
   else
@@ -50,14 +54,14 @@ namespace :full_search do
     FullSearch.models.each do |model|
       stored = FullSearch::Index.stored_config_hash(model)
       current = model.full_search_dsl.config_hash
-      status = stored == current ? "ok" : "stale"
+      status = (stored == current) ? "ok" : "stale"
       source_fields = model.full_search_dsl.fields.select(&:source).map(&:name)
 
       drift_info = if source_fields.any?
         empty_count = ActiveRecord::Base.connection.execute(<<~SQL).first["c"]
           SELECT COUNT(*) AS c
           FROM #{FullSearch::Index.fts_table_name(model)}
-          WHERE #{source_fields.map { |c| "#{c} = ''" }.join(' OR ')}
+          WHERE #{source_fields.map { |c| "#{c} = ''" }.join(" OR ")}
         SQL
         " | empty source fields: #{empty_count}"
       else

@@ -18,7 +18,11 @@ class FullSearch::TransactionsTest < ActiveSupport::TestCase
   def teardown
     Customer.delete_all
     Account.delete_all
-    FullSearch::Index.drop!(@model) rescue nil
+    begin
+      FullSearch::Index.drop!(@model)
+    rescue
+      nil
+    end
   end
 
   def test_insert_inside_transaction_is_indexed
@@ -26,7 +30,7 @@ class FullSearch::TransactionsTest < ActiveSupport::TestCase
     ActiveRecord::Base.transaction do
       customer = @model.create!(account_id: @account.id, first_name: "Sam")
     end
-    results = @model.full_search("Sam", filters: { account_id: @account.id })
+    results = @model.full_search("Sam", filters: {account_id: @account.id})
     assert_includes results.to_a, customer
   end
 
@@ -35,7 +39,7 @@ class FullSearch::TransactionsTest < ActiveSupport::TestCase
       @model.create!(account_id: @account.id, first_name: "Sam")
       raise ActiveRecord::Rollback
     end
-    results = @model.full_search("Sam", filters: { account_id: @account.id })
+    results = @model.full_search("Sam", filters: {account_id: @account.id})
     assert_empty results.to_a
   end
 end

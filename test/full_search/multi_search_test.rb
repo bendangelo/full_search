@@ -22,8 +22,16 @@ class FullSearch::MultiSearchTest < ActiveSupport::TestCase
   end
 
   def teardown
-    FullSearch::Index.drop!(@customer_model) rescue nil
-    FullSearch::Index.drop!(@vehicle_model) rescue nil
+    begin
+      FullSearch::Index.drop!(@customer_model)
+    rescue
+      nil
+    end
+    begin
+      FullSearch::Index.drop!(@vehicle_model)
+    rescue
+      nil
+    end
     Customer.delete_all
     Vehicle.delete_all
   end
@@ -38,10 +46,10 @@ class FullSearch::MultiSearchTest < ActiveSupport::TestCase
     result = FullSearch.multi_search(
       query: "User",
       groups: [
-        { key: :customers, label: "Customers", model: @customer_model,
-          filters: { account_id: account.id }, limit: 8 },
-        { key: :vehicles, label: "Vehicles", model: @vehicle_model,
-          filters: { account_id: account.id }, limit: 8 }
+        {key: :customers, label: "Customers", model: @customer_model,
+         filters: {account_id: account.id}, limit: 8},
+        {key: :vehicles, label: "Vehicles", model: @vehicle_model,
+         filters: {account_id: account.id}, limit: 8}
       ]
     )
 
@@ -64,9 +72,12 @@ class FullSearch::MultiSearchTest < ActiveSupport::TestCase
     result = FullSearch.multi_search(
       query: "Sam",
       groups: [
-        { key: :customers, label: "Customers", model: @customer_model,
-          filters: { account_id: account.id },
-          scope: ->(rel) { called = true; rel } }
+        {key: :customers, label: "Customers", model: @customer_model,
+         filters: {account_id: account.id},
+         scope: ->(rel) {
+           called = true
+           rel
+         }}
       ]
     )
 
@@ -82,8 +93,8 @@ class FullSearch::MultiSearchTest < ActiveSupport::TestCase
     result = FullSearch.multi_search(
       query: "User",
       groups: [
-        { key: :customers, label: "Customers", model: @customer_model,
-          filters: { account_id: account.id }, limit: 3, offset: 2 }
+        {key: :customers, label: "Customers", model: @customer_model,
+         filters: {account_id: account.id}, limit: 3, offset: 2}
       ]
     )
 
@@ -99,8 +110,8 @@ class FullSearch::MultiSearchTest < ActiveSupport::TestCase
     result = FullSearch.multi_search(
       query: "",
       groups: [
-        { key: :customers, label: "Customers", model: @customer_model,
-          filters: { account_id: account.id } }
+        {key: :customers, label: "Customers", model: @customer_model,
+         filters: {account_id: account.id}}
       ]
     )
 
@@ -113,7 +124,7 @@ class FullSearch::MultiSearchTest < ActiveSupport::TestCase
       FullSearch.multi_search(
         query: "test",
         groups: [
-          { key: :bad, label: "Bad" }
+          {key: :bad, label: "Bad"}
         ]
       )
     end
@@ -125,7 +136,7 @@ class FullSearch::MultiSearchTest < ActiveSupport::TestCase
     assert_raises(FullSearch::NotConfiguredError) do
       FullSearch.multi_search(
         query: "Sam",
-        groups: [{ key: :bad, model: unconfigured }]
+        groups: [{key: :bad, model: unconfigured}]
       )
     end
   end
@@ -136,7 +147,7 @@ class FullSearch::MultiSearchTest < ActiveSupport::TestCase
     FullSearch::Index.rebuild!(@customer_model)
     result = FullSearch.multi_search(
       query: "Arthur",
-      groups: [{ key: :customers, model: @customer_model, filters: { account_id: account.id }, highlight: true }]
+      groups: [{key: :customers, model: @customer_model, filters: {account_id: account.id}, highlight: true}]
     )
     record = result[:groups].first[:results].first
     assert record.respond_to?(:full_search_snippet)
@@ -151,8 +162,8 @@ class FullSearch::MultiSearchTest < ActiveSupport::TestCase
     result = FullSearch.multi_search(
       query: "Arthur",
       groups: [
-        { key: :customers, label: "Customers", model: @customer_model,
-          filters: { account_id: account.id }, highlight_fields: true }
+        {key: :customers, label: "Customers", model: @customer_model,
+         filters: {account_id: account.id}, highlight_fields: true}
       ]
     )
 

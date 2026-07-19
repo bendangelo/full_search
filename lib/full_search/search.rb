@@ -26,8 +26,8 @@ module FullSearch
       parsed = QueryParser.parse(query)
       exact_ids = ExactMatch.ids_for(model, query, filters)
       primary_ids = fts_match_ids(parsed)
-      fallback_ids = dsl.typo_tolerance? && matching_strategy != "all" ? trigram_match_ids(parsed, primary_ids) : []
-      fuzzy_ids = dsl.typo_tolerance? && matching_strategy != "all" && primary_ids.empty? && fallback_ids.empty? ? fuzzy_match_ids(parsed) : []
+      fallback_ids = (dsl.typo_tolerance? && matching_strategy != "all") ? trigram_match_ids(parsed, primary_ids) : []
+      fuzzy_ids = (dsl.typo_tolerance? && matching_strategy != "all" && primary_ids.empty? && fallback_ids.empty?) ? fuzzy_match_ids(parsed) : []
 
       all_ids = (exact_ids + primary_ids + fallback_ids + fuzzy_ids).uniq
       return model.none if all_ids.empty?
@@ -87,7 +87,11 @@ module FullSearch
       match_expr = QueryParser.to_match_expression(parsed)
       return [] if match_expr.empty?
 
-      term = parsed.last rescue nil
+      term = begin
+        parsed.last
+      rescue
+        nil
+      end
       return [] if term.nil?
 
       if term.length < dsl.typo_tolerance_min_term_length.to_i
@@ -164,7 +168,11 @@ module FullSearch
     end
 
     def fuzzy_match_ids(parsed)
-      term = parsed.last rescue nil
+      term = begin
+        parsed.last
+      rescue
+        nil
+      end
       return [] if term.nil?
 
       term_str = term.is_a?(Array) ? extract_last_term_string(term) : term.to_s
@@ -234,7 +242,7 @@ module FullSearch
 
       (1..a_len).each do |i|
         (1..b_len).each do |j|
-          cost = a[i - 1] == b[j - 1] ? 0 : 1
+          cost = (a[i - 1] == b[j - 1]) ? 0 : 1
           d[i][j] = [
             d[i - 1][j] + 1,
             d[i][j - 1] + 1,

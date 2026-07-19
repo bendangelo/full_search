@@ -16,7 +16,9 @@ class FullSearch::TestHelpersTest < ActiveSupport::TestCase
   end
 
   def teardown
-    FullSearch::Index.drop!(@model) rescue nil
+    FullSearch::Index.drop!(@model)
+  rescue
+    nil
   end
 
   def test_rebuild_creates_index

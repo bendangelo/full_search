@@ -14,7 +14,7 @@ class FullSearch::FullSearchIdsTest < ActiveSupport::TestCase
     account = Account.create!(name: "Acme")
     customer = model.create!(account_id: account.id, first_name: "Sam")
     FullSearch::Index.rebuild!(model)
-    ids = model.full_search_ids("Sam", filters: { account_id: account.id })
+    ids = model.full_search_ids("Sam", filters: {account_id: account.id})
     assert_includes ids, customer.id
   end
 end

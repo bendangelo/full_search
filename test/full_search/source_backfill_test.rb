@@ -89,15 +89,19 @@ class FullSearch::SourceBackfillTest < ActiveSupport::TestCase
   def clean_fts_tables!
     ActiveRecord::Base.connection.execute(
       "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE '%_fts%'"
-    ).each { |r| ActiveRecord::Base.connection.execute("DROP TRIGGER IF EXISTS #{r['name']}") }
+    ).each { |r| ActiveRecord::Base.connection.execute("DROP TRIGGER IF EXISTS #{r["name"]}") }
     ActiveRecord::Base.connection.execute(
       "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%_fts%'"
-    ).each { |r| ActiveRecord::Base.connection.execute("DROP TABLE IF EXISTS #{r['name']}") }
+    ).each { |r| ActiveRecord::Base.connection.execute("DROP TABLE IF EXISTS #{r["name"]}") }
     ActiveRecord::Base.connection.execute("DROP TABLE IF EXISTS full_search_index_versions")
   end
 
   def full_search_cleanup(model)
     return unless model
-    FullSearch::Index.drop!(model) rescue nil
+    begin
+      FullSearch::Index.drop!(model)
+    rescue
+      nil
+    end
   end
 end

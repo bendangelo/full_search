@@ -3,7 +3,6 @@
 require "active_record"
 require "active_support"
 require "active_support/concern"
-require "set"
 
 require "full_search/version"
 require "full_search/config"

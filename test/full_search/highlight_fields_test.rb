@@ -24,7 +24,7 @@ class FullSearch::HighlightFieldsTest < ActiveSupport::TestCase
     @model.create!(account_id: @account.id, first_name: "Samantha", last_name: "Smith")
     FullSearch::Index.rebuild!(@model)
 
-    results = @model.full_search("Samantha", filters: { account_id: @account.id }, highlight_fields: true).to_a
+    results = @model.full_search("Samantha", filters: {account_id: @account.id}, highlight_fields: true).to_a
     result = results.first
 
     assert result.respond_to?(:full_search_highlight_fields)
@@ -35,7 +35,7 @@ class FullSearch::HighlightFieldsTest < ActiveSupport::TestCase
     @model.create!(account_id: @account.id, first_name: "Samantha", last_name: "Smith")
     FullSearch::Index.rebuild!(@model)
 
-    results = @model.full_search("Samantha", filters: { account_id: @account.id }, highlight_fields: true).to_a
+    results = @model.full_search("Samantha", filters: {account_id: @account.id}, highlight_fields: true).to_a
     result = results.first
 
     assert_nil result.full_search_highlight_fields["last_name"]
@@ -57,7 +57,7 @@ class FullSearch::HighlightFieldsTest < ActiveSupport::TestCase
     model.create!(account_id: account.id, first_name: "Sarah", last_name: "Jones")
     FullSearch::Index.rebuild!(model)
 
-    results = model.full_search("sar", filters: { account_id: account.id }, highlight_fields: true).to_a
+    results = model.full_search("sar", filters: {account_id: account.id}, highlight_fields: true).to_a
     result = results.first
 
     assert result.respond_to?(:full_search_highlight_fields)
@@ -80,7 +80,7 @@ class FullSearch::HighlightFieldsTest < ActiveSupport::TestCase
     model.create!(account_id: account.id, first_name: "Samantha", last_name: "Smith")
     FullSearch::Index.rebuild!(model)
 
-    results = model.full_search("Samantha", filters: { account_id: account.id }, highlight_fields: true).to_a
+    results = model.full_search("Samantha", filters: {account_id: account.id}, highlight_fields: true).to_a
     result = results.first
 
     assert result.respond_to?(:full_search_highlight_fields)
@@ -108,7 +108,7 @@ class FullSearch::HighlightFieldsTest < ActiveSupport::TestCase
     model.create!(account_id: account.id, first_name: "Sarah", last_name: "Jones")
     FullSearch::Index.rebuild!(model)
 
-    results = model.full_search("sa", filters: { account_id: account.id }, highlight_fields: true).to_a
+    results = model.full_search("sa", filters: {account_id: account.id}, highlight_fields: true).to_a
     result = results.first
 
     assert result, "Expected a prefix match for sa"

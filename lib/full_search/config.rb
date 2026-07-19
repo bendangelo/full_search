@@ -11,7 +11,6 @@ module FullSearch
       @default_async_reindex = true
       @default_tokenizer = "unicode61"
     end
-
   end
 
   class << self

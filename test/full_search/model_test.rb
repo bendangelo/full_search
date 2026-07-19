@@ -33,7 +33,7 @@ class FullSearch::ModelTest < ActiveSupport::TestCase
     customer = @model.create!(account_id: 1, first_name: "Sam")
     FullSearch::Index.rebuild!(@model)
 
-    results = @model.full_search("Sam", filters: { account_id: 1 })
+    results = @model.full_search("Sam", filters: {account_id: 1})
     assert_kind_of ActiveRecord::Relation, results
     assert_includes results.to_a, customer
   end
@@ -42,7 +42,7 @@ class FullSearch::ModelTest < ActiveSupport::TestCase
     customer = @model.create!(account_id: 1, first_name: "Sam")
     FullSearch::Index.rebuild!(@model)
 
-    results = @model.search("Sam", filters: { account_id: 1 })
+    results = @model.search("Sam", filters: {account_id: 1})
     assert_kind_of ActiveRecord::Relation, results
     assert_includes results.to_a, customer
   end
@@ -60,7 +60,7 @@ class FullSearch::ModelTest < ActiveSupport::TestCase
     end
     klass.table_name = "customers"
 
-    assert_equal :custom_search, klass.search("anything", filters: { account_id: 1 })
+    assert_equal :custom_search, klass.search("anything", filters: {account_id: 1})
   end
 
   def test_full_search_still_works_when_search_is_overridden
@@ -79,7 +79,7 @@ class FullSearch::ModelTest < ActiveSupport::TestCase
     customer = klass.create!(account_id: 1, first_name: "Sam")
     FullSearch::Index.rebuild!(klass)
 
-    results = klass.full_search("Sam", filters: { account_id: 1 })
+    results = klass.full_search("Sam", filters: {account_id: 1})
     assert_kind_of ActiveRecord::Relation, results
     assert_includes results.to_a, customer
   end

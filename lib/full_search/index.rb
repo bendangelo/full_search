@@ -5,6 +5,7 @@ class FilterColumnPlaceholder
   def initialize(name:)
     @name = name.to_s
   end
+
   def unindexed?
     true
   end
@@ -166,7 +167,7 @@ module FullSearch
       def create_virtual_table_sql(model)
         dsl = model.full_search_dsl
         columns = (dsl.fields + dsl.filters.map { |f| FilterColumnPlaceholder.new(name: f.name) })
-        column_list = columns.map { |c| c.respond_to?(:unindexed?) && c.unindexed? ? "#{c.name} UNINDEXED" : c.name }.join(", ")
+        column_list = columns.map { |c| (c.respond_to?(:unindexed?) && c.unindexed?) ? "#{c.name} UNINDEXED" : c.name }.join(", ")
 
         <<~SQL
           CREATE VIRTUAL TABLE #{fts_table_name(model)} USING fts5(
@@ -282,7 +283,7 @@ module FullSearch
       end
 
       def soft_delete_removal_trigger_sql(model)
-        dsl = model.full_search_dsl
+        model.full_search_dsl
         fts_table = fts_table_name(model)
         when_clause = SoftDelete.soft_delete_remove_clause(model)
 
@@ -303,7 +304,7 @@ module FullSearch
       def create_trigram_virtual_table_sql(model)
         dsl = model.full_search_dsl
         columns = (dsl.fields + dsl.filters.map { |f| FilterColumnPlaceholder.new(name: f.name) })
-        column_list = columns.map { |c| c.respond_to?(:unindexed?) && c.unindexed? ? "#{c.name} UNINDEXED" : c.name }.join(", ")
+        column_list = columns.map { |c| (c.respond_to?(:unindexed?) && c.unindexed?) ? "#{c.name} UNINDEXED" : c.name }.join(", ")
 
         <<~SQL
           CREATE VIRTUAL TABLE #{trigram_table_name(model)} USING fts5(

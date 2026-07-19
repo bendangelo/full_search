@@ -28,7 +28,7 @@ class FullSearch::TypoTest < ActiveSupport::TestCase
     customer = @model.create!(account_id: @account.id, first_name: "Samantha")
     FullSearch::Index.rebuild!(@model)
 
-    results = @model.full_search("antha", filters: { account_id: @account.id })
+    results = @model.full_search("antha", filters: {account_id: @account.id})
     assert_includes results.to_a, customer
   end
 
@@ -36,7 +36,7 @@ class FullSearch::TypoTest < ActiveSupport::TestCase
     customer = @model.create!(account_id: @account.id, first_name: "Sarah")
     FullSearch::Index.rebuild!(@model)
 
-    results = @model.full_search("sarh", filters: { account_id: @account.id })
+    results = @model.full_search("sarh", filters: {account_id: @account.id})
     assert_includes results.to_a, customer
   end
 
@@ -51,7 +51,7 @@ class FullSearch::TypoTest < ActiveSupport::TestCase
     customer = model_without.create!(account_id: @account.id, first_name: "Samantha")
     FullSearch::Index.rebuild!(model_without)
 
-    results = model_without.full_search("antha", filters: { account_id: @account.id })
+    results = model_without.full_search("antha", filters: {account_id: @account.id})
     refute_includes results.to_a, customer
   end
 
@@ -75,7 +75,7 @@ class FullSearch::TypoTest < ActiveSupport::TestCase
     model.create!(account_id: account.id, first_name: "Rings")
     FullSearch::Index.rebuild!(model)
 
-    results = model.full_search("Rnigs", filters: { account_id: account.id })
+    results = model.full_search("Rnigs", filters: {account_id: account.id})
     assert_equal 1, results.size
   end
 
@@ -94,7 +94,7 @@ class FullSearch::TypoTest < ActiveSupport::TestCase
     model.create!(account_id: account.id, first_name: "Lord")
     FullSearch::Index.rebuild!(model)
 
-    results = model.full_search("Lrod", filters: { account_id: account.id })
+    results = model.full_search("Lrod", filters: {account_id: account.id})
     assert_equal 0, results.size
   end
 
@@ -112,7 +112,7 @@ class FullSearch::TypoTest < ActiveSupport::TestCase
     model.create!(account_id: account.id, first_name: "Frankenstein")
     FullSearch::Index.rebuild!(model)
 
-    results = model.full_search("Farnkenstien", filters: { account_id: account.id })
+    results = model.full_search("Farnkenstien", filters: {account_id: account.id})
     assert_equal 1, results.size
   end
 
@@ -130,7 +130,7 @@ class FullSearch::TypoTest < ActiveSupport::TestCase
     model.create!(account_id: account.id, first_name: "Dracula")
     FullSearch::Index.rebuild!(model)
 
-    results = model.full_search("Darclua", filters: { account_id: account.id })
+    results = model.full_search("Darclua", filters: {account_id: account.id})
     assert_equal 0, results.size
   end
 
@@ -149,15 +149,15 @@ class FullSearch::TypoTest < ActiveSupport::TestCase
     model.create!(account_id: account.id, first_name: "Harry", last_name: "Potter")
     FullSearch::Index.rebuild!(model)
 
-    results = model.full_search("harry pottr", filters: { account_id: account.id }, matching_strategy: "all")
+    results = model.full_search("harry pottr", filters: {account_id: account.id}, matching_strategy: "all")
     assert_equal 0, results.size
   end
 
   def test_typo_match_highlight_fields
-    customer = @model.create!(account_id: @account.id, first_name: "Sarah")
+    @model.create!(account_id: @account.id, first_name: "Sarah")
     FullSearch::Index.rebuild!(@model)
 
-    results = @model.full_search("sarh", filters: { account_id: @account.id }, highlight_fields: true).to_a
+    results = @model.full_search("sarh", filters: {account_id: @account.id}, highlight_fields: true).to_a
     result = results.first
 
     assert result, "Expected a fuzzy match for sarh"
