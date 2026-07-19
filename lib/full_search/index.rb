@@ -40,9 +40,9 @@ module FullSearch
           conn.execute(backfill_sql(model)) if fts_was_created
           conn.execute(backfill_trigram_sql(model)) if trigram_was_created
           reindex_source_fields!(model) if dsl.fields.any?(&:source)
-          store_config_hash!(model)
         end
 
+        store_config_hash!(model)
         ensure_triggers!(model) if model_table_exists?(model)
       end
 
