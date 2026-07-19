@@ -32,4 +32,14 @@ class FullSearch::DslTest < ActiveSupport::TestCase
   def test_invalid_field_name_raises
     assert_raises(FullSearch::InvalidFieldError) { @dsl.field "bad; name" }
   end
+
+  def test_config_hash_changes_when_source_proc_changes
+    dsl1 = FullSearch::Dsl.new(Customer)
+    dsl1.field :name_search, source: -> { name }
+
+    dsl2 = FullSearch::Dsl.new(Customer)
+    dsl2.field :name_search, source: -> { name&.upcase }
+
+    refute_equal dsl1.config_hash, dsl2.config_hash
+  end
 end

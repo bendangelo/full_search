@@ -88,8 +88,8 @@ module FullSearch
         soft_delete_column,
         typo_tolerance?,
         typo_tolerance_min_term_length,
-        fields.map { |f| [f.name, f.weight, f.source.nil? ? "column" : "source", f.reindex_on, f.async] },
-        exact_matches.map { |e| [e.name] },
+        fields.map { |f| [f.name, f.weight, f.source.nil? ? "column" : f.source.source_location&.join(":"), f.reindex_on, f.async] },
+        exact_matches.map { |e| [e.name, e.source&.source_location&.join(":")] },
         filters.map { |f| [f.name, f.required] },
         rank_bys.map { |r| [r.column, r.direction] }
       ].inspect)
