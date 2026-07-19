@@ -47,6 +47,7 @@ module FullSearch
           end
           conn.execute(backfill_sql(model))
           conn.execute(backfill_trigram_sql(model)) if dsl.typo_tolerance?
+          reindex_source_fields!(model) if dsl.fields.any?(&:source)
           create_triggers!(model)
           optimize!(model)
           store_config_hash!(model, rebuilt_at: Time.current)
@@ -55,6 +56,12 @@ module FullSearch
 
       def optimize!(model)
         connection.execute("INSERT INTO #{fts_table_name(model)}(#{fts_table_name(model)}) VALUES('optimize');")
+      end
+
+      def reindex_source_fields!(model)
+        model.find_each do |record|
+          FullSearch::Callbacks.reindex_record!(record)
+        end
       end
 
       def drop!(model)
