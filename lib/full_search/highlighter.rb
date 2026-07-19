@@ -53,27 +53,38 @@ module FullSearch
       end
     end
 
+    def self.compute_max_typos(query, dsl)
+      return nil unless dsl.typo_tolerance?
+      length = query.length
+      min_length = dsl.typo_tolerance_min_term_length.to_i
+      return nil if length < min_length
+      return 2 if length >= 9
+      1
+    end
+
     def self.manual_snippets(records, model, query)
       dsl = model.full_search_dsl
       config = dsl.highlight_config || { open_tag: "<mark>", close_tag: "</mark>" }
-        cols = dsl.fields.map(&:name)
+      cols = dsl.fields.map(&:name)
+      max_typos = compute_max_typos(query, dsl)
 
-        records.to_h do |record|
-          text = cols.map { |col| record.full_search_text_for(col).to_s }.join(" ").strip
-          highlighted = manual_highlight(text, query, config)
-          [record.id, highlighted.presence]
-        end
+      records.to_h do |record|
+        text = cols.map { |col| record.full_search_text_for(col).to_s }.join(" ").strip
+        highlighted = manual_highlight(text, query, config, max_typos: max_typos)
+        [record.id, highlighted.presence]
+      end
     end
 
     def self.manual_field_snippets(records, model, query)
       dsl = model.full_search_dsl
       config = dsl.highlight_config || { open_tag: "<mark>", close_tag: "</mark>" }
       fields = dsl.fields
+      max_typos = compute_max_typos(query, dsl)
 
       records.to_h do |record|
         snippets = fields.each_with_object({}) do |field, hash|
           value = record.full_search_text_for(field.name).to_s
-          highlighted = manual_highlight(value, query, config)
+          highlighted = manual_highlight(value, query, config, max_typos: max_typos)
           key = field.as || field.name
           hash[key] = highlighted if highlighted.include?(config[:open_tag])
         end
@@ -86,11 +97,12 @@ module FullSearch
       return {} if dsl.exact_matches.empty?
 
       config = dsl.highlight_config || { open_tag: "<mark>", close_tag: "</mark>" }
+      max_typos = compute_max_typos(query, dsl)
 
       records.to_h do |record|
         snippets = dsl.exact_matches.each_with_object({}) do |em, hash|
           value = exact_match_field_value(em, record)
-          highlighted = manual_highlight(value.to_s, query, config)
+          highlighted = manual_highlight(value.to_s, query, config, max_typos: max_typos)
           hash[em.name.to_s] = highlighted if highlighted.include?(config[:open_tag])
         end
         [record.id, snippets]
@@ -105,20 +117,18 @@ module FullSearch
       end
     end
 
-    def self.manual_highlight(text, query, config)
+    def self.manual_highlight(text, query, config, max_typos: nil)
       return text if text.empty? || query.empty?
 
       open_tag = config[:open_tag]
       close_tag = config[:close_tag]
       escaped_query = Regexp.escape(query)
 
-      # 1. Fast path — literal match (case-insensitive)
       if text.match?(/#{escaped_query}/i)
         return text.gsub(/#{escaped_query}/i, "#{open_tag}\\0#{close_tag}")
       end
 
-      # 2. Fuzzy fallback — find closest substring within typo tolerance
-      best = best_fuzzy_match(text, query)
+      best = best_fuzzy_match(text, query, max_typos: max_typos)
       if best
         start_pos, end_pos = best
         return "#{text[0...start_pos]}#{open_tag}#{text[start_pos...end_pos]}#{close_tag}#{text[end_pos..]}"
@@ -127,18 +137,17 @@ module FullSearch
       text
     end
 
-    def self.best_fuzzy_match(text, query)
+    def self.best_fuzzy_match(text, query, max_typos: nil)
       query_len = query.length
       text_len = text.length
       return nil if query_len == 0 || text_len == 0
 
-      max_typos = max_allowed_typos(query_len)
+      max_typos ||= max_allowed_typos(query_len)
       return nil if max_typos < 0
 
       best_score = max_typos + 1
       best_range = nil
 
-      # Scan windows from (query_len - max_typos) to (query_len + max_typos)
       min_window = [1, query_len - max_typos].max
       max_window = [text_len, query_len + max_typos].min
       return nil if min_window > max_window
@@ -149,7 +158,7 @@ module FullSearch
           distance = damerau_levenshtein(query.downcase, substr.downcase)
           next if distance > max_typos
 
-          if distance < best_score || (distance == best_score && window_len > (best_range[1] - best_range[0]).to_i)
+          if best_range.nil? || distance < best_score || (distance == best_score && window_len > (best_range[1] - best_range[0]))
             best_score = distance
             best_range = [start, start + window_len]
           end
