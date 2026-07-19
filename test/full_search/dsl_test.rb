@@ -35,11 +35,52 @@ class FullSearch::DslTest < ActiveSupport::TestCase
 
   def test_config_hash_changes_when_source_proc_changes
     dsl1 = FullSearch::Dsl.new(Customer)
-    dsl1.field :name_search, source: -> { name }
+    dsl1.field :name_search, source: -> { name }, version: 1
 
     dsl2 = FullSearch::Dsl.new(Customer)
-    dsl2.field :name_search, source: -> { name&.upcase }
+    dsl2.field :name_search, source: -> { name&.upcase }, version: 2
 
     refute_equal dsl1.config_hash, dsl2.config_hash
+  end
+
+  def test_config_hash_differs_when_version_differs
+    dsl1 = FullSearch::Dsl.new(Customer)
+    dsl1.field :name, source: -> { name }, version: 1
+
+    dsl2 = FullSearch::Dsl.new(Customer)
+    dsl2.field :name, source: -> { name }, version: 2
+
+    refute_equal dsl1.config_hash, dsl2.config_hash
+  end
+
+  def test_config_hash_same_when_version_nil
+    dsl1 = FullSearch::Dsl.new(Customer)
+    dsl1.field :name, source: -> { name }
+
+    dsl2 = FullSearch::Dsl.new(Customer)
+    dsl2.field :name, source: -> { name }
+
+    assert_equal dsl1.config_hash, dsl2.config_hash
+  end
+
+  def test_duplicate_field_name_raises
+    @dsl.field :first_name
+    assert_raises(FullSearch::InvalidFieldError) do
+      @dsl.field :first_name
+    end
+  end
+
+  def test_duplicate_filter_name_raises
+    @dsl.filter :account_id
+    assert_raises(FullSearch::InvalidFieldError) do
+      @dsl.filter :account_id
+    end
+  end
+
+  def test_field_and_filter_same_name_raises
+    @dsl.field :account_id
+    assert_raises(FullSearch::InvalidFieldError) do
+      @dsl.filter :account_id
+    end
   end
 end

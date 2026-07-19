@@ -4,8 +4,8 @@ module FullSearch
   class Dsl
     attr_reader :fields, :exact_matches, :filters, :model_class, :tokenize, :highlight_config, :rank_bys
 
-    Field = Data.define(:name, :weight, :source, :reindex_on, :async, :as)
-    ExactMatch = Data.define(:name, :source)
+    Field = Data.define(:name, :weight, :source, :reindex_on, :async, :as, :version)
+    ExactMatch = Data.define(:name, :source, :version)
     Filter = Data.define(:name, :required)
     RankBy = Data.define(:column, :direction)
 
@@ -19,24 +19,27 @@ module FullSearch
       @soft_delete_column = nil
     end
 
-    def field(name, weight: 1, source: nil, reindex_on: nil, async: FullSearch.config.default_async_reindex, as: nil)
+    def field(name, weight: 1, source: nil, reindex_on: nil, async: FullSearch.config.default_async_reindex, as: nil, version: nil)
+      raise InvalidFieldError, "Duplicate name: #{name.inspect}" if name_taken?(name)
       unless valid_name?(name)
         raise InvalidFieldError, "Invalid field name: #{name.inspect}"
       end
       if as && !valid_name?(as)
         raise InvalidFieldError, "Invalid field alias (as): #{as.inspect}"
       end
-      @fields << Field.new(name: name.to_s, weight: weight.to_i, source: source, reindex_on: reindex_on&.to_s, async: async, as: as&.to_s)
+      @fields << Field.new(name: name.to_s, weight: weight.to_i, source: source, reindex_on: reindex_on&.to_s, async: async, as: as&.to_s, version: version)
     end
 
-    def exact_match(name, source: -> { public_send(name) })
+    def exact_match(name, source: -> { public_send(name) }, version: nil)
+      raise InvalidFieldError, "Duplicate exact_match name: #{name.inspect}" if name_taken?(name)
       unless valid_name?(name)
         raise InvalidFieldError, "Invalid exact_match name: #{name.inspect}"
       end
-      @exact_matches << ExactMatch.new(name: name.to_s, source: source)
+      @exact_matches << ExactMatch.new(name: name.to_s, source: source, version: version)
     end
 
     def rank_by(column, direction = :desc)
+      raise InvalidFieldError, "Duplicate rank_by column: #{column.inspect}" if name_taken?(column)
       unless valid_name?(column)
         raise InvalidFieldError, "Invalid rank_by column: #{column.inspect}"
       end
@@ -44,6 +47,7 @@ module FullSearch
     end
 
     def filter(name, required: false)
+      raise InvalidFieldError, "Duplicate filter name: #{name.inspect}" if name_taken?(name)
       unless valid_name?(name)
         raise InvalidFieldError, "Invalid filter name: #{name.inspect}"
       end
@@ -91,8 +95,8 @@ module FullSearch
         soft_delete_column,
         typo_tolerance?,
         typo_tolerance_min_term_length,
-        fields.map { |f| [f.name, f.weight, f.source.nil? ? "column" : f.source.source_location&.join(":"), f.reindex_on, f.async, f.as] },
-        exact_matches.map { |e| [e.name, e.source&.source_location&.join(":")] },
+        fields.map { |f| [f.name, f.weight, f.source.nil? ? "column" : "proc:#{f.version}", f.reindex_on, f.async, f.as] },
+        exact_matches.map { |e| [e.name, "proc:#{e.version}"] },
         filters.map { |f| [f.name, f.required] },
         rank_bys.map { |r| [r.column, r.direction] }
       ].inspect)
@@ -102,6 +106,14 @@ module FullSearch
 
     def valid_name?(name)
       name.to_s.match?(/\A[a-zA-Z_]\w*\z/)
+    end
+
+    def name_taken?(name)
+      str = name.to_s
+      fields.any? { |f| f.name == str } ||
+        filters.any? { |f| f.name == str } ||
+        exact_matches.any? { |e| e.name == str } ||
+        rank_bys.any? { |r| r.column == str }
     end
   end
 end
