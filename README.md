@@ -2,6 +2,10 @@
 
 SQLite FTS5 full-text search for Rails/ActiveRecord. A lightweight, self-contained alternative to `pg_search` for apps already running on SQLite.
 
+## When to use
+
+`full_search` is designed for apps with **100,000 records or fewer per table** that want full-text search without running a separate service. If you're on SQLite and need keyword search, phrase matching, typo-tolerant substring queries, or result highlighting, this gem gives you production-quality search with zero infrastructure — no Elasticsearch, no Meilisearch, no Sidekiq queue.
+
 ## Installation
 
 Add to your Gemfile:
@@ -30,12 +34,12 @@ end
 ```
 
 ```ruby
-Customer.full_search("sam", filters: { account_id: 1 }).page(params[:page])
+Customer.search("sam", filters: { account_id: 1 }).page(params[:page])
 ```
 
 ## Features
 
-- Declarative `full_search` DSL
+- Declarative `full_search` DSL with `search` / `full_search` query methods
 - SQLite FTS5 backed
 - Required-filter enforcement for multi-tenant apps
 - Exact-match queries for encrypted identifiers
@@ -44,14 +48,58 @@ Customer.full_search("sam", filters: { account_id: 1 }).page(params[:page])
 - Phrase, exclusion, and OR query operators
 - FTS5 `highlight()` support for result snippets
 - Opt-in trigram typo/substring fallback (requires SQLite >= 3.34)
-- Rake tasks: `full_search:rebuild`, `full_search:optimize`, `full_search:status`
+
+## Index management
+
+FTS indexes are SQLite virtual tables (`customers_fts`, `vehicles_fts`, etc.) that mirror your model tables. They stay in sync via database triggers on `INSERT` / `UPDATE` / `DELETE`.
+
+### Auto-management on app load
+
+When `auto_manage_schema` is enabled (default in the generated initializer), the railtie hooks into Rails `after_initialize` and:
+
+1. Creates missing FTS tables for every model using `full_search`
+2. Compares each table's stored config hash against the current DSL
+3. Rebuilds the index automatically when the DSL changes (new fields, different tokenizer, etc.)
+
+```ruby
+# config/initializers/full_search.rb
+FullSearch.configure do |config|
+  config.auto_manage_schema = true
+end
+```
+
+### In production
+
+Auto-management runs on every Rails process boot (web, worker, console). For zero-downtime deploys where old processes still serve traffic, or if you prefer explicit control, set `auto_manage_schema` to `false` and run rebuilds manually:
+
+```bash
+# Rebuild all indexes
+bin/rails full_search:rebuild
+
+# Rebuild specific models by table name
+bin/rails 'full_search:rebuild[customers,vehicles]'
+```
+
+A rebuild drops the FTS virtual tables, recreates them, backfills existing rows, and installs sync triggers. For tables under 100k rows this completes in under a second.
+
+### Rake tasks
+
+| Task | Description |
+|------|-------------|
+| `full_search:rebuild` | Drop and recreate all FTS tables, backfill data, install triggers. Pass model names to target specific tables. |
+| `full_search:optimize` | Run FTS5 [`optimize`](https://www.sqlite.org/fts5.html#the_optimize_command) to merge b-tree segments. Useful after bulk updates. |
+| `full_search:status` | Show each model's index status (`ok` / `stale`) and count of empty sourced fields. |
+
+### Config hash drift detection
+
+Every FTS table stores a SHA256 digest of its DSL configuration in the `full_search_index_versions` table. When the DSL changes (e.g., adding a field), the stored hash no longer matches, and `rebuild!` is triggered automatically (if `auto_manage_schema` is true) to bring the index in line with the new definition. If `auto_manage_schema` is false, queries still run but raise `ConfigChangedError` when the hash doesn't match.
 
 ## Query operators
 
 ```ruby
-Customer.full_search('"Sam Smith"', filters: { account_id: 1 })      # phrase
-Customer.full_search("honda -civic", filters: { account_id: 1 })     # exclusion
-Customer.full_search("honda OR toyota", filters: { account_id: 1 })  # OR
+Customer.search('"Sam Smith"', filters: { account_id: 1 })      # phrase
+Customer.search("honda -civic", filters: { account_id: 1 })     # exclusion
+Customer.search("honda OR toyota", filters: { account_id: 1 })  # OR
 ```
 
 ## Highlighting
@@ -66,7 +114,7 @@ end
 ```
 
 ```ruby
-Customer.full_search("sam", filters: { account_id: 1 }, highlight: true)
+Customer.search("sam", filters: { account_id: 1 }, highlight: true)
 # each result has #full_search_snippet
 ```
 

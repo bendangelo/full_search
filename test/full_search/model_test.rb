@@ -37,4 +37,50 @@ class FullSearch::ModelTest < ActiveSupport::TestCase
     assert_kind_of ActiveRecord::Relation, results
     assert_includes results.to_a, customer
   end
+
+  def test_search_is_alias_for_full_search
+    customer = @model.create!(account_id: 1, first_name: "Sam")
+    FullSearch::Index.rebuild!(@model)
+
+    results = @model.search("Sam", filters: { account_id: 1 })
+    assert_kind_of ActiveRecord::Relation, results
+    assert_includes results.to_a, customer
+  end
+
+  def test_search_does_not_override_existing_search_method
+    klass = Class.new(Customer) do
+      def self.search(*)
+        :custom_search
+      end
+
+      full_search do
+        field :first_name, weight: 5
+        filter :account_id, required: true
+      end
+    end
+    klass.table_name = "customers"
+
+    assert_equal :custom_search, klass.search("anything", filters: { account_id: 1 })
+  end
+
+  def test_full_search_still_works_when_search_is_overridden
+    klass = Class.new(Customer) do
+      def self.search(*)
+        :custom_search
+      end
+
+      full_search do
+        field :first_name, weight: 5
+        filter :account_id, required: true
+      end
+    end
+    klass.table_name = "customers"
+
+    customer = klass.create!(account_id: 1, first_name: "Sam")
+    FullSearch::Index.rebuild!(klass)
+
+    results = klass.full_search("Sam", filters: { account_id: 1 })
+    assert_kind_of ActiveRecord::Relation, results
+    assert_includes results.to_a, customer
+  end
 end
