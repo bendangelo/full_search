@@ -11,7 +11,6 @@ module FullSearch
           @full_search_dsl.tokenize(query_or_options[:tokenize]) if query_or_options.is_a?(Hash) && query_or_options.key?(:tokenize)
           @full_search_dsl.instance_eval(&block) if block_given?
           FullSearch::Callbacks.install!(self)
-          FullSearch::Index.ensure_table!(self)
           include InstanceMethods
 
           FullSearch.register_model(self)
@@ -48,6 +47,16 @@ module FullSearch
       end
     end
 
+    def self.evaluate_source(record, field)
+      if field.source
+        record.instance_exec(&field.source)
+      else
+        record.public_send(field.name)
+      end
+    rescue NameError => e
+      raise e.class, "#{record.class.name}: full_search source block for field #{field.name.inspect} failed: #{e.message}"
+    end
+
     module InstanceMethods
       attr_accessor :full_search_snippet, :full_search_highlight_fields
 
@@ -56,7 +65,7 @@ module FullSearch
         field = dsl.fields.find { |f| f.name == field_name.to_s || f.as == field_name.to_s }
         return nil unless field
 
-        field.source ? instance_exec(&field.source) : public_send(field.name)
+        FullSearch::Model.evaluate_source(self, field)
       end
     end
   end

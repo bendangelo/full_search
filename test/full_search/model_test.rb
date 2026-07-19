@@ -83,4 +83,35 @@ class FullSearch::ModelTest < ActiveSupport::TestCase
     assert_kind_of ActiveRecord::Relation, results
     assert_includes results.to_a, customer
   end
+
+  def test_full_search_defers_setup_until_after_class_is_defined
+    klass = Class.new(Customer) do
+      self.table_name = "customers"
+
+      full_search do
+        field :computed, source: -> { computed_value }
+      end
+
+      def computed_value
+        "hello"
+      end
+    end
+
+    assert_kind_of FullSearch::Dsl, klass.full_search_dsl
+
+    FullSearch::Index.rebuild!(klass)
+    record = klass.create!(account_id: 1, first_name: "Sam")
+    assert_equal "hello", record.full_search_text_for(:computed)
+  end
+
+  def test_source_block_error_includes_field_context
+    field = FullSearch::Dsl::Field.new(name: "bad", weight: 1, source: -> { missing_method }, reindex_on: nil, async: false, as: nil, version: nil)
+    record = Customer.new(account_id: 1, first_name: "Sam")
+
+    error = assert_raises(NameError) do
+      FullSearch::Model.evaluate_source(record, field)
+    end
+    assert_includes error.message, "field \"bad\""
+    assert_includes error.message, "missing_method"
+  end
 end

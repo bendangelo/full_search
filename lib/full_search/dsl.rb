@@ -21,46 +21,46 @@ module FullSearch
 
     def field(name, weight: 1, source: nil, reindex_on: nil, async: FullSearch.config.default_async_reindex, as: nil, version: nil)
       unless valid_name?(name)
-        raise InvalidFieldError, "Invalid field name: #{name.inspect}"
+        raise InvalidFieldError, "#{model_class.name}: invalid field name #{name.inspect}"
       end
       if as && !valid_name?(as)
-        raise InvalidFieldError, "Invalid field alias (as): #{as.inspect}"
+        raise InvalidFieldError, "#{model_class.name}: invalid field alias (as): #{as.inspect}"
       end
       str = name.to_s
-      raise InvalidFieldError, "Duplicate field name: #{name.inspect}" if fields.any? { |f| f.name == str }
-      raise InvalidFieldError, "Field name conflicts with filter: #{name.inspect}" if filters.any? { |f| f.name == str }
+      raise InvalidFieldError, "#{model_class.name}: duplicate field name #{name.inspect}" if fields.any? { |f| f.name == str }
+      raise InvalidFieldError, "#{model_class.name}: field name #{name.inspect} conflicts with existing filter" if filters.any? { |f| f.name == str }
       @fields << Field.new(name: str, weight: weight.to_i, source: source, reindex_on: reindex_on&.to_s, async: async, as: as&.to_s, version: version)
     end
 
     def exact_match(name, source: -> { public_send(name) }, version: nil)
       unless valid_name?(name)
-        raise InvalidFieldError, "Invalid exact_match name: #{name.inspect}"
+        raise InvalidFieldError, "#{model_class.name}: invalid exact_match name #{name.inspect}"
       end
       str = name.to_s
-      raise InvalidFieldError, "Duplicate exact_match name: #{name.inspect}" if exact_matches.any? { |e| e.name == str }
+      raise InvalidFieldError, "#{model_class.name}: duplicate exact_match name #{name.inspect}" if exact_matches.any? { |e| e.name == str }
       @exact_matches << ExactMatch.new(name: str, source: source, version: version)
     end
 
     def rank_by(column, direction = :desc)
       unless valid_name?(column)
-        raise InvalidFieldError, "Invalid rank_by column: #{column.inspect}"
+        raise InvalidFieldError, "#{model_class.name}: invalid rank_by column #{column.inspect}"
       end
       dir = direction.to_s.downcase
       unless %w[asc desc].include?(dir)
-        raise InvalidFieldError, "Invalid rank_by direction: #{direction.inspect}. Use :asc or :desc."
+        raise InvalidFieldError, "#{model_class.name}: invalid rank_by direction #{direction.inspect}. Use :asc or :desc."
       end
       str = column.to_s
-      raise InvalidFieldError, "Duplicate rank_by column: #{column.inspect}" if rank_bys.any? { |r| r.column == str }
+      raise InvalidFieldError, "#{model_class.name}: duplicate rank_by column #{column.inspect}" if rank_bys.any? { |r| r.column == str }
       @rank_bys << RankBy.new(column: str, direction: dir.to_sym)
     end
 
     def filter(name, required: false)
       unless valid_name?(name)
-        raise InvalidFieldError, "Invalid filter name: #{name.inspect}"
+        raise InvalidFieldError, "#{model_class.name}: invalid filter name #{name.inspect}"
       end
       str = name.to_s
-      raise InvalidFieldError, "Duplicate filter name: #{name.inspect}" if filters.any? { |f| f.name == str }
-      raise InvalidFieldError, "Filter name conflicts with field: #{name.inspect}" if fields.any? { |f| f.name == str }
+      raise InvalidFieldError, "#{model_class.name}: duplicate filter name #{name.inspect}" if filters.any? { |f| f.name == str }
+      raise InvalidFieldError, "#{model_class.name}: filter name #{name.inspect} conflicts with existing field" if fields.any? { |f| f.name == str }
       @filters << Filter.new(name: str, required: required)
     end
 

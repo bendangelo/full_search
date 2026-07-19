@@ -30,7 +30,9 @@ class FullSearch::DslTest < ActiveSupport::TestCase
   end
 
   def test_invalid_field_name_raises
-    assert_raises(FullSearch::InvalidFieldError) { @dsl.field "bad; name" }
+    error = assert_raises(FullSearch::InvalidFieldError) { @dsl.field "bad; name" }
+    assert_includes error.message, "Customer"
+    assert_includes error.message, "bad; name"
   end
 
   def test_config_hash_changes_when_source_proc_changes
@@ -65,22 +67,28 @@ class FullSearch::DslTest < ActiveSupport::TestCase
 
   def test_duplicate_field_name_raises
     @dsl.field :first_name
-    assert_raises(FullSearch::InvalidFieldError) do
+    error = assert_raises(FullSearch::InvalidFieldError) do
       @dsl.field :first_name
     end
+    assert_includes error.message, "Customer"
+    assert_includes error.message, "duplicate field name"
   end
 
   def test_duplicate_filter_name_raises
     @dsl.filter :account_id
-    assert_raises(FullSearch::InvalidFieldError) do
+    error = assert_raises(FullSearch::InvalidFieldError) do
       @dsl.filter :account_id
     end
+    assert_includes error.message, "Customer"
+    assert_includes error.message, "duplicate filter name"
   end
 
   def test_field_and_filter_same_name_raises
     @dsl.field :account_id
-    assert_raises(FullSearch::InvalidFieldError) do
+    error = assert_raises(FullSearch::InvalidFieldError) do
       @dsl.filter :account_id
     end
+    assert_includes error.message, "Customer"
+    assert_includes error.message, "conflicts"
   end
 end

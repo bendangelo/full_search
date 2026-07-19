@@ -28,7 +28,11 @@ class FullSearch::EncryptedSourceFieldTest < ActiveSupport::TestCase
   end
 
   def teardown
-    FullSearch::Index.drop!(@model) rescue nil
+    begin
+      FullSearch::Index.drop!(@model)
+    rescue
+      nil
+    end
     Vehicle.delete_all
     Account.delete_all
     clean_fts_tables!

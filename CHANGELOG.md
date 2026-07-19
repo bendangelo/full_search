@@ -41,6 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Lowered `required_ruby_version` from `3.2.0` to `3.1.0`.
 - `Gemfile` now reads the Rails version from `RAILS_VERSION` env var for CI matrix support.
+- `full_search` no longer creates FTS tables during class definition. Table creation is deferred to the Railtie `after_initialize` hook, avoiding load-order errors when `source:` blocks reference associations or methods defined later in the class body.
+
+### Fixed
+
+- DSL validation errors now include the model class name for easier debugging.
+- Source block `NameError`/`NoMethodError` exceptions now include the model and field name.
 
 ### Removed
 

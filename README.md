@@ -78,6 +78,10 @@ These two operations are often confused:
 - **Rebuild** (`full_search:rebuild` / `Customer.rebuild!`) — drops and recreates the FTS virtual table. Needed when the DSL changes (fields added/removed, tokenizer changed, etc.). The table is re-created from scratch, backfilled, triggers re-installed, and the index is optimized.
 - **Reindex** (`Customer.reindex!` / `FullSearch::Index.reindex_source_fields!`) — updates existing FTS rows with fresh values from computed `source:` fields only. The table structure is untouched. Database triggers cover regular column changes automatically; only Ruby-evaluated `source:` blocks need an explicit reindex.
 
+### Setup lifecycle
+
+`full_search` evaluates the DSL block and installs callbacks when the model class loads, but it does **not** create the FTS table until Rails `after_initialize` (or until you call `FullSearch.setup!` or `FullSearch::Index.rebuild!` manually). This guarantees that `source:` blocks run against fully-loaded model definitions, avoiding load-order issues where associations or methods defined later in the class body are not yet available.
+
 > **Note on rebuild locking:** The `lock_rebuilds` option prevents concurrent rebuilds
 > within the same process/connection. For multi-process or multi-host deployments,
 > run `full_search:rebuild` from a single deployment step.

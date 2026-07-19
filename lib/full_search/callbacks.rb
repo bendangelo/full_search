@@ -53,7 +53,7 @@ module FullSearch
       field = dsl.fields.find { |f| f.name == field_name }
       return unless field&.source
 
-      value = record.instance_exec(&field.source)
+      value = FullSearch::Model.evaluate_source(record, field)
       table = qt(FullSearch::Index.fts_table_name(record.class))
       conn = ActiveRecord::Base.connection
       conn.execute(
