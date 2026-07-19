@@ -129,4 +129,20 @@ class FullSearch::SearchTest < ActiveSupport::TestCase
     results = @customer_model.full_search("Sam", filters: { account_id: account.id }, highlight: true)
     assert_kind_of Array, results
   end
+
+  def test_required_filter_accepts_string_keys
+    account = Account.create!(name: "Acme")
+    customer = @customer_model.create!(account_id: account.id, first_name: "Sam")
+    FullSearch::Index.rebuild!(@customer_model)
+    results = @customer_model.full_search("Sam", filters: { "account_id" => account.id })
+    assert_includes results.to_a, customer
+  end
+
+  def test_nil_filter_values
+    account = Account.create!(name: "Acme")
+    customer = @customer_model.create!(account_id: account.id, first_name: "Sam")
+    FullSearch::Index.rebuild!(@customer_model)
+    results = @customer_model.full_search("Sam", filters: { account_id: nil })
+    assert_empty results.to_a
+  end
 end

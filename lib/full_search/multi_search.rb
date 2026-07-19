@@ -14,6 +14,8 @@ module FullSearch
     def call
       searched = groups.map do |group|
         model = fetch(group, :model)
+        raise FullSearch::NotConfiguredError, "#{model} is not full_search configured" unless model.full_search_dsl
+
         filters = group[:filters] || {}
         limit = positive_integer(group[:limit], 8)
         offset = positive_integer(group[:offset], 0)
@@ -24,6 +26,7 @@ module FullSearch
           filters: filters,
           limit: raw_limit,
           offset: offset,
+          highlight: group[:highlight],
           highlight_fields: group[:highlight_fields]
         )
 

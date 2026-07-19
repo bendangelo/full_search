@@ -119,6 +119,30 @@ class FullSearch::MultiSearchTest < ActiveSupport::TestCase
     end
   end
 
+  def test_raises_when_model_not_configured
+    unconfigured = Class.new(Customer)
+    unconfigured.table_name = "customers"
+    assert_raises(FullSearch::NotConfiguredError) do
+      FullSearch.multi_search(
+        query: "Sam",
+        groups: [{ key: :bad, model: unconfigured }]
+      )
+    end
+  end
+
+  def test_highlight_option
+    account = Account.create!(name: "Acme")
+    @customer_model.create!(account_id: account.id, first_name: "Arthur")
+    FullSearch::Index.rebuild!(@customer_model)
+    result = FullSearch.multi_search(
+      query: "Arthur",
+      groups: [{ key: :customers, model: @customer_model, filters: { account_id: account.id }, highlight: true }]
+    )
+    record = result[:groups].first[:results].first
+    assert record.respond_to?(:full_search_snippet)
+    assert_includes record.full_search_snippet, "<mark>"
+  end
+
   def test_highlight_fields_option
     account = Account.create!(name: "Acme")
     @customer_model.create!(account_id: account.id, first_name: "Arthur")
