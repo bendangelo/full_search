@@ -25,11 +25,11 @@ class FullSearch::SourceBackfillTest < ActiveSupport::TestCase
     end
     @model.table_name = "customers"
 
-    @model.create!(account_id: @account.id, first_name: "Sarah")
+    record = @model.create!(account_id: @account.id, first_name: "Sarah")
     FullSearch::Index.rebuild!(@model)
 
     row = ActiveRecord::Base.connection.execute(
-      "SELECT computed FROM #{FullSearch::Index.fts_table_name(@model)}"
+      "SELECT computed FROM #{FullSearch::Index.fts_table_name(@model)} WHERE rowid = #{record.id}"
     ).first
 
     assert_equal "source_value_Sarah", row["computed"]
@@ -46,13 +46,12 @@ class FullSearch::SourceBackfillTest < ActiveSupport::TestCase
     end
     @model.table_name = "customers"
 
-    @model.create!(account_id: @account.id, first_name: "Alex")
+    record = @model.create!(account_id: @account.id, first_name: "Alex")
     FullSearch::Index.rebuild!(@model)
 
-    rows = ActiveRecord::Base.connection.execute(
-      "SELECT greeting, farewell FROM #{FullSearch::Index.fts_table_name(@model)}"
-    )
-    row = rows.first
+    row = ActiveRecord::Base.connection.execute(
+      "SELECT greeting, farewell FROM #{FullSearch::Index.fts_table_name(@model)} WHERE rowid = #{record.id}"
+    ).first
 
     assert_equal "Hello Alex", row["greeting"]
     assert_equal "Goodbye Alex", row["farewell"]

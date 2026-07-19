@@ -41,5 +41,10 @@ class FullSearch::JobTest < ActiveSupport::TestCase
       "SELECT customer_name FROM #{ActiveRecord::Base.connection.quote_table_name(fts_table)} WHERE rowid = #{ActiveRecord::Base.connection.quote(vehicle.id)}"
     ).first
     assert_equal "Samantha", row["customer_name"]
+  ensure
+    Customer.delete_all
+    Vehicle.delete_all
+    Account.delete_all
+    Object.send(:remove_const, :VehicleForReindexTest) if Object.const_defined?(:VehicleForReindexTest)
   end
 end
