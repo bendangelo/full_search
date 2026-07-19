@@ -43,5 +43,6 @@ class Customer < ActiveRecord::Base
 end
 
 class Vehicle < ActiveRecord::Base
+  encrypts :license_plate, deterministic: true
   belongs_to :customer, optional: true
 end

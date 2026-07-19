@@ -12,11 +12,20 @@ module FullSearch
       relation = model.all
       filters.each { |name, value| relation = relation.where(name => value) }
 
-      conditions = dsl.exact_matches.map do |em|
-        relation.model.arel_table[em.name].eq(cleaned)
+      exact_ids = dsl.exact_matches.flat_map do |em|
+        value = exact_match_value(em, cleaned)
+        next [] if value.nil? || value.to_s.empty?
+
+        relation.where(em.name => value).pluck(:id)
       end
 
-      relation.where(conditions.reduce(:or)).pluck(:id)
+      exact_ids.uniq
+    end
+
+    def self.exact_match_value(em, query)
+      fake = Object.new
+      fake.define_singleton_method(em.name) { query }
+      fake.instance_exec(&em.source)
     end
   end
 end

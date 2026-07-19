@@ -4,25 +4,79 @@ require "test_helper"
 
 class FullSearch::ExactMatchTest < ActiveSupport::TestCase
   def setup
-    @vehicle_model = Class.new(Vehicle) do
-      full_search do
-        field :license_plate, weight: 5
-        exact_match :vin, source: -> { vin }
-        filter :account_id, required: true
-      end
-    end
-    @vehicle_model.table_name = "vehicles"
+    @account = Account.create!(name: "Acme")
   end
 
   def teardown
     Vehicle.delete_all
+    Account.delete_all
   end
 
-  def test_exact_match_returns_ids
-    account = Account.create!(name: "Acme")
-    vehicle = @vehicle_model.create!(account_id: account.id, vin: "1HGCM82633A004352")
+  def test_exact_match_evaluates_source_proc
+    search_model = Class.new(Vehicle) do
+      full_search do
+        exact_match :make, source: -> { make&.upcase }
+        filter :account_id, required: true
+      end
+    end
+    search_model.table_name = "vehicles"
 
-    ids = FullSearch::ExactMatch.ids_for(@vehicle_model, "1HGCM82633A004352", { account_id: account.id })
+    FullSearch::Index.rebuild!(search_model)
+
+    vehicle = Vehicle.create!(account_id: @account.id, make: "HONDA")
+
+    ids = FullSearch::ExactMatch.ids_for(search_model, "honda", { account_id: @account.id })
+    assert_includes ids, vehicle.id
+  end
+
+  def test_exact_match_without_source
+    search_model = Class.new(Vehicle) do
+      full_search do
+        exact_match :make
+        filter :account_id, required: true
+      end
+    end
+    search_model.table_name = "vehicles"
+
+    FullSearch::Index.rebuild!(search_model)
+
+    vehicle = Vehicle.create!(account_id: @account.id, make: "Honda")
+
+    ids = FullSearch::ExactMatch.ids_for(search_model, "Honda", { account_id: @account.id })
+    assert_includes ids, vehicle.id
+  end
+
+  def test_exact_match_source_proc_fallback
+    search_model = Class.new(Vehicle) do
+      full_search do
+        exact_match :make, source: -> { raise "boom" }
+        filter :account_id, required: true
+      end
+    end
+    search_model.table_name = "vehicles"
+
+    FullSearch::Index.rebuild!(search_model)
+    Vehicle.create!(account_id: @account.id, make: "Honda")
+
+    assert_raises(StandardError) do
+      FullSearch::ExactMatch.ids_for(search_model, "Honda", { account_id: @account.id })
+    end
+  end
+
+  def test_exact_match_on_encrypted_column
+    search_model = Class.new(Vehicle) do
+      full_search do
+        exact_match :license_plate, source: -> { license_plate&.to_s&.strip&.upcase }
+        filter :account_id, required: true
+      end
+    end
+    search_model.table_name = "vehicles"
+
+    FullSearch::Index.rebuild!(search_model)
+
+    vehicle = Vehicle.create!(account_id: @account.id, license_plate: "ABC-1234")
+
+    ids = FullSearch::ExactMatch.ids_for(search_model, "ABC-1234", { account_id: @account.id })
     assert_includes ids, vehicle.id
   end
 end
