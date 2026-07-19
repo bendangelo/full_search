@@ -152,4 +152,18 @@ class FullSearch::TypoTest < ActiveSupport::TestCase
     results = model.full_search("harry pottr", filters: { account_id: account.id }, matching_strategy: "all")
     assert_equal 0, results.size
   end
+
+  def test_typo_match_highlight_fields
+    customer = @model.create!(account_id: @account.id, first_name: "Sarah")
+    FullSearch::Index.rebuild!(@model)
+
+    results = @model.full_search("sarh", filters: { account_id: @account.id }, highlight_fields: true).to_a
+    result = results.first
+
+    assert result, "Expected a fuzzy match for sarh"
+    assert_includes result.full_search_highlight_fields["first_name"], "<mark>",
+      "Expected fuzzy match to produce a highlight"
+    assert_includes result.full_search_highlight_fields["first_name"], "Sar",
+      "Expected fuzzy highlight to include the corrected text"
+  end
 end

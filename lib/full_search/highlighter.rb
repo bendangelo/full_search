@@ -13,7 +13,7 @@ module FullSearch
 
     def self.apply_fields!(records, model, query)
       fields = build_field_snippets(model, query)
-      if fields.empty? && records.any?
+      if fields.values.all?(&:empty?) && records.any?
         fields = manual_field_snippets(records, model, query)
       end
       exact_fields = exact_match_field_snippets(records, model, query)
@@ -107,7 +107,62 @@ module FullSearch
 
     def self.manual_highlight(text, query, config)
       return text if text.empty? || query.empty?
-      text.gsub(/#{Regexp.escape(query)}/i, "#{config[:open_tag]}\\0#{config[:close_tag]}")
+
+      open_tag = config[:open_tag]
+      close_tag = config[:close_tag]
+      escaped_query = Regexp.escape(query)
+
+      # 1. Fast path — literal match (case-insensitive)
+      if text.match?(/#{escaped_query}/i)
+        return text.gsub(/#{escaped_query}/i, "#{open_tag}\\0#{close_tag}")
+      end
+
+      # 2. Fuzzy fallback — find closest substring within typo tolerance
+      best = best_fuzzy_match(text, query)
+      if best
+        start_pos, end_pos = best
+        return "#{text[0...start_pos]}#{open_tag}#{text[start_pos...end_pos]}#{close_tag}#{text[end_pos..]}"
+      end
+
+      text
+    end
+
+    def self.best_fuzzy_match(text, query)
+      query_len = query.length
+      text_len = text.length
+      return nil if query_len == 0 || text_len == 0
+
+      max_typos = max_allowed_typos(query_len)
+      return nil if max_typos < 0
+
+      best_score = max_typos + 1
+      best_range = nil
+
+      # Scan windows from (query_len - max_typos) to (query_len + max_typos)
+      min_window = [1, query_len - max_typos].max
+      max_window = [text_len, query_len + max_typos].min
+      return nil if min_window > max_window
+
+      (min_window..max_window).each do |window_len|
+        (0..(text_len - window_len)).each do |start|
+          substr = text[start, window_len]
+          distance = damerau_levenshtein(query.downcase, substr.downcase)
+          next if distance > max_typos
+
+          if distance < best_score || (distance == best_score && window_len > (best_range[1] - best_range[0]).to_i)
+            best_score = distance
+            best_range = [start, start + window_len]
+          end
+        end
+      end
+
+      best_range
+    end
+
+    def self.max_allowed_typos(length)
+      return -1 if length < 3
+      return 2 if length >= 9
+      1
     end
 
     def self.highlight_rows(model, query)
@@ -139,6 +194,34 @@ module FullSearch
 
     def self.quote(value)
       connection.quote(value)
+    end
+
+    def self.damerau_levenshtein(a, b)
+      a_len = a.length
+      b_len = b.length
+      return a_len if b_len == 0
+      return b_len if a_len == 0
+
+      d = Array.new(a_len + 1) { Array.new(b_len + 1, 0) }
+      (0..a_len).each { |i| d[i][0] = i }
+      (0..b_len).each { |j| d[0][j] = j }
+
+      (1..a_len).each do |i|
+        (1..b_len).each do |j|
+          cost = a[i - 1] == b[j - 1] ? 0 : 1
+          d[i][j] = [
+            d[i - 1][j] + 1,
+            d[i][j - 1] + 1,
+            d[i - 1][j - 1] + cost
+          ].min
+
+          if i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1]
+            d[i][j] = [d[i][j], d[i - 2][j - 2] + 1].min
+          end
+        end
+      end
+
+      d[a_len][b_len]
     end
   end
 end
