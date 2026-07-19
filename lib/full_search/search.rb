@@ -114,6 +114,11 @@ module FullSearch
       column_fields = dsl.fields.select { |f| f.source.nil? }
       source_fields = dsl.fields.select { |f| f.source }
 
+      soft_delete_clause = ""
+      if dsl.soft_delete_column && !include_soft_deleted
+        soft_delete_clause = "AND #{model.table_name}.#{dsl.soft_delete_column} IS NULL"
+      end
+
       ids = []
 
       if column_fields.any?
@@ -121,17 +126,17 @@ module FullSearch
           "#{connection.quote_table_name(model.table_name)}.#{connection.quote_column_name(field.name)} LIKE #{connection.quote("#{term}%")}"
         end.join(" OR ")
 
-        sql = <<~SQL
-          SELECT #{model.table_name}.id
-          FROM #{model.table_name}
-          WHERE (#{like_conditions})
-        SQL
-
         filter_conditions = filters.map do |name, value|
           "AND #{model.table_name}.#{name} = #{connection.quote(value)}"
         end.join(" ")
 
-        ids = connection.execute("#{sql} #{filter_conditions}").map { |r| r["id"] }
+        sql = <<~SQL
+          SELECT #{model.table_name}.id
+          FROM #{model.table_name}
+          WHERE (#{like_conditions}) #{filter_conditions} #{soft_delete_clause}
+        SQL
+
+        ids = connection.execute(sql).map { |r| r["id"] }
         return ids if ids.any?
       end
 
@@ -141,18 +146,18 @@ module FullSearch
           "#{fts_table}.#{field.name} LIKE #{connection.quote("#{term}%")}"
         end.join(" OR ")
 
-        sql = <<~SQL
-          SELECT #{model.table_name}.id
-          FROM #{fts_table}
-          JOIN #{model.table_name} ON #{model.table_name}.id = #{fts_table}.rowid
-          WHERE (#{like_conditions})
-        SQL
-
         filter_conditions = filters.map do |name, value|
           "AND #{fts_table}.#{name} = #{connection.quote(value)}"
         end.join(" ")
 
-        ids = connection.execute("#{sql} #{filter_conditions}").map { |r| r["id"] }
+        sql = <<~SQL
+          SELECT #{model.table_name}.id
+          FROM #{fts_table}
+          JOIN #{model.table_name} ON #{model.table_name}.id = #{fts_table}.rowid
+          WHERE (#{like_conditions}) #{filter_conditions} #{soft_delete_clause}
+        SQL
+
+        ids = connection.execute(sql).map { |r| r["id"] }
       end
 
       ids
@@ -173,6 +178,15 @@ module FullSearch
 
       register_levenshtein!
 
+      soft_delete_clause = ""
+      if dsl.soft_delete_column && !include_soft_deleted
+        soft_delete_clause = "AND #{model.table_name}.#{dsl.soft_delete_column} IS NULL"
+      end
+
+      filter_conditions = filters.map do |name, value|
+        "AND #{model.table_name}.#{name} = #{connection.quote(value)}"
+      end.join(" ")
+
       conditions = column_fields.map do |field|
         "levenshtein(LOWER(#{connection.quote_table_name(model.table_name)}.#{connection.quote_column_name(field.name)}), #{connection.quote(term_str.downcase)}) <= #{max_typos}"
       end.join(" OR ")
@@ -180,14 +194,10 @@ module FullSearch
       sql = <<~SQL
         SELECT #{model.table_name}.id
         FROM #{model.table_name}
-        WHERE (#{conditions})
+        WHERE (#{conditions}) #{filter_conditions} #{soft_delete_clause}
       SQL
 
-      filter_conditions = filters.map do |name, value|
-        "AND #{model.table_name}.#{name} = #{connection.quote(value)}"
-      end.join(" ")
-
-      connection.execute("#{sql} #{filter_conditions}").map { |r| r["id"] }
+      connection.execute(sql).map { |r| r["id"] }
     end
 
     def max_allowed_typos(length)

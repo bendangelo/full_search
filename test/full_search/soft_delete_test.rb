@@ -65,6 +65,27 @@ class FullSearch::SoftDeleteTest < ActiveSupport::TestCase
     assert_includes results.to_a, customer
   end
 
+  def test_soft_deleted_records_not_leaked_by_typo_fallback
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name, weight: 5
+        field :last_name, weight: 5
+        filter :account_id, required: true
+        typo_tolerance
+        soft_delete_column :discarded_at
+      end
+    end
+    model.table_name = "customers"
+    account = Account.create!(name: "Acme")
+    good = model.create!(account_id: account.id, first_name: "Samantha", last_name: "Smith")
+    model.create!(account_id: account.id, first_name: "Samantha", last_name: "Smith", discarded_at: Time.current)
+    FullSearch::Index.rebuild!(model)
+
+    results = model.full_search("saman", filters: { account_id: account.id })
+    assert_equal 1, results.size
+    assert_equal good.id, results.first.id
+  end
+
   def test_non_soft_deleted_model_still_works
     account = Account.create!(name: "Acme")
     vehicle_model = Class.new(Vehicle) do
