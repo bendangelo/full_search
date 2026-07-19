@@ -29,6 +29,12 @@ module FullSearch
       end
     end
 
+    included do |base|
+      unless base.respond_to?(:search)
+        base.singleton_class.alias_method :search, :full_search
+      end
+    end
+
     module InstanceMethods
       attr_accessor :full_search_snippet, :full_search_highlight_fields
 
