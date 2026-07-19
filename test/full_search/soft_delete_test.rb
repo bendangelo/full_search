@@ -17,6 +17,7 @@ class FullSearch::SoftDeleteTest < ActiveSupport::TestCase
 
   def teardown
     Customer.delete_all
+    FullSearch::Index.drop!(@model) rescue nil
   end
 
   def test_soft_deleted_record_excluded_from_search
@@ -65,14 +66,15 @@ class FullSearch::SoftDeleteTest < ActiveSupport::TestCase
     assert_includes results.to_a, customer
   end
 
-  def test_soft_deleted_records_not_leaked_by_typo_fallback
+  def test_soft_deleted_records_not_leaked_by_typo_like_fallback
     model = Class.new(Customer) do
       full_search do
         field :first_name, weight: 5
         field :last_name, weight: 5
         filter :account_id, required: true
-        typo_tolerance
+        typo_tolerance(min_term_length: 3)
         soft_delete_column :discarded_at
+        tokenize "trigram"
       end
     end
     model.table_name = "customers"
@@ -81,7 +83,8 @@ class FullSearch::SoftDeleteTest < ActiveSupport::TestCase
     model.create!(account_id: account.id, first_name: "Samantha", last_name: "Smith", discarded_at: Time.current)
     FullSearch::Index.rebuild!(model)
 
-    results = model.full_search("saman", filters: { account_id: account.id })
+    # 2-char query forces like_prefix_ids fallback (trigram requires 3+ chars)
+    results = model.full_search("sa", filters: { account_id: account.id })
     assert_equal 1, results.size
     assert_equal good.id, results.first.id
   end
