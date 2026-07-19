@@ -34,11 +34,34 @@ class FullSearch::SoftDeleteTest < ActiveSupport::TestCase
 
   def test_soft_deleted_record_included_when_flag_set
     account = Account.create!(name: "Acme")
-    customer = @model.create!(account_id: account.id, first_name: "Sam")
+    customer = @model.create!(account_id: account.id, first_name: "Sam", discarded_at: Time.current)
     FullSearch::Index.rebuild!(@model)
-    customer.update!(discarded_at: Time.current)
 
     results = @model.full_search("Sam", filters: { account_id: account.id }, include_soft_deleted: true)
+    assert_includes results.to_a, customer
+  end
+
+  def test_soft_delete_removes_from_fts_index
+    account = Account.create!(name: "Acme")
+    customer = @model.create!(account_id: account.id, first_name: "Sam")
+    FullSearch::Index.rebuild!(@model)
+
+    customer.update!(discarded_at: Time.current)
+
+    fts_count = ActiveRecord::Base.connection.execute(
+      "SELECT COUNT(*) AS c FROM #{FullSearch::Index.fts_table_name(@model)} WHERE rowid = #{customer.id}"
+    ).first["c"]
+    assert_equal 0, fts_count
+  end
+
+  def test_restore_re_adds_to_fts_index
+    account = Account.create!(name: "Acme")
+    customer = @model.create!(account_id: account.id, first_name: "Sam", discarded_at: Time.current)
+    FullSearch::Index.rebuild!(@model)
+
+    customer.update!(discarded_at: nil)
+
+    results = @model.full_search("Sam", filters: { account_id: account.id })
     assert_includes results.to_a, customer
   end
 

@@ -201,6 +201,9 @@ module FullSearch
         connection.execute(insert_trigger_sql(model))
         connection.execute(delete_trigger_sql(model))
         connection.execute(update_trigger_sql(model))
+        if model.full_search_dsl.soft_delete_column
+          connection.execute(soft_delete_removal_trigger_sql(model))
+        end
         if model.full_search_dsl.typo_tolerance?
           connection.execute(insert_trigram_trigger_sql(model))
           connection.execute(delete_trigram_trigger_sql(model))
@@ -216,7 +219,7 @@ module FullSearch
 
       def trigger_names(model)
         base = fts_table_name(model)
-        %W[#{base}_ai #{base}_ad #{base}_au]
+        %W[#{base}_ai #{base}_ad #{base}_au #{base}_au_soft_delete]
       end
 
       def trigram_trigger_names(model)
@@ -252,7 +255,7 @@ module FullSearch
         cols_str = col_names(cols)
         fts_table = fts_table_name(model)
 
-        when_clause = SoftDelete.delete_transition_sql(model)
+        when_clause = SoftDelete.active_update_clause(model)
 
         <<~SQL
           CREATE TRIGGER #{trigger_names(model)[2]} AFTER UPDATE ON #{model.table_name} #{when_clause}
@@ -260,6 +263,19 @@ module FullSearch
             DELETE FROM #{fts_table} WHERE rowid = old.id;
             INSERT INTO #{fts_table}(rowid, #{cols_str})
             VALUES (new.id, #{values});
+          END;
+        SQL
+      end
+
+      def soft_delete_removal_trigger_sql(model)
+        dsl = model.full_search_dsl
+        fts_table = fts_table_name(model)
+        when_clause = SoftDelete.soft_delete_remove_clause(model)
+
+        <<~SQL
+          CREATE TRIGGER #{trigger_names(model)[2]}_soft_delete AFTER UPDATE ON #{model.table_name} #{when_clause}
+          BEGIN
+            DELETE FROM #{fts_table} WHERE rowid = old.id;
           END;
         SQL
       end
@@ -328,7 +344,7 @@ module FullSearch
         cols_str = col_names(cols)
         trigram_table = trigram_table_name(model)
 
-        when_clause = SoftDelete.delete_transition_sql(model)
+        when_clause = SoftDelete.active_update_clause(model)
 
         <<~SQL
           CREATE TRIGGER #{trigram_trigger_names(model)[2]} AFTER UPDATE ON #{model.table_name} #{when_clause}
