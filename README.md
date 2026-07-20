@@ -45,6 +45,27 @@ end
 Customer.search("sam", filters: { account_id: 1 }).page(params[:page])
 ```
 
+### Field aliasing with `as:`
+
+Use `as:` to give a field a different column name in the FTS table. This is useful when
+the model's accessor name differs from the desired search index key — for example, storing
+a computed value (last 8 chars of VIN) in a shorter or semantically-named column:
+
+```ruby
+class Vehicle < ApplicationRecord
+  full_search do
+    field :vin_last8, weight: 2, source: -> { vin&.last(8)&.upcase }, as: :vin
+    field :make, weight: 4
+    field :model, weight: 4
+    filter :account_id, required: true
+    highlight
+  end
+end
+```
+
+The FTS table stores the value under `vin` (not `vin_last8`). Search results highlight
+keyed as `vin`, and the `full_search_text_for(:vin)` lookup works as expected.
+
 ## Features
 
 - Declarative `full_search` DSL with `search` / `full_search` query methods

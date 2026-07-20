@@ -46,9 +46,9 @@ module FullSearch
           conn.execute(backfill_sql(model)) if fts_was_created
           conn.execute(backfill_trigram_sql(model)) if trigram_was_created
           reindex_source_fields!(model) if dsl.fields.any?(&:source)
+          store_config_hash!(model)
         end
 
-        store_config_hash!(model)
         ensure_triggers!(model) if model_table_exists?(model)
 
         verified_tables.add(model.table_name)
@@ -188,6 +188,10 @@ module FullSearch
         connection.quote_table_name(name)
       end
 
+      def column_name(col)
+        (col.respond_to?(:as) && col.as) ? col.as : col.name
+      end
+
       def qc(name)
         connection.quote_column_name(name)
       end
@@ -223,7 +227,7 @@ module FullSearch
       def create_virtual_table_sql(model)
         dsl = model.full_search_dsl
         columns = (dsl.fields + dsl.filters.map { |f| FilterColumnPlaceholder.new(name: f.name) } + extra_columns(model))
-        column_list = columns.map { |c| (c.respond_to?(:unindexed?) && c.unindexed?) ? "#{qc(c.name)} UNINDEXED" : qc(c.name) }.join(", ")
+        column_list = columns.map { |c| (c.respond_to?(:unindexed?) && c.unindexed?) ? "#{qc(column_name(c))} UNINDEXED" : qc(column_name(c)) }.join(", ")
 
         "CREATE VIRTUAL TABLE #{qt(fts_table_name(model))} USING fts5(#{column_list}, tokenize='#{dsl.tokenize}');"
       end
@@ -244,7 +248,7 @@ module FullSearch
         where_clause = dsl.conditional_index? ? " WHERE (#{dsl.index_if_sql})" : ""
 
         <<~SQL
-          INSERT INTO #{qt(fts_table_name(model))}(rowid, #{cols.map { |c| qc(c.name) }.join(", ")})
+          INSERT INTO #{qt(fts_table_name(model))}(rowid, #{cols.map { |c| qc(column_name(c)) }.join(", ")})
           SELECT #{qt(model.table_name)}.id, #{select} FROM #{qt(model.table_name)}#{where_clause};
         SQL
       end
@@ -369,7 +373,7 @@ module FullSearch
       def create_trigram_virtual_table_sql(model)
         dsl = model.full_search_dsl
         columns = (dsl.fields + dsl.filters.map { |f| FilterColumnPlaceholder.new(name: f.name) } + extra_columns(model))
-        column_list = columns.map { |c| (c.respond_to?(:unindexed?) && c.unindexed?) ? "#{qc(c.name)} UNINDEXED" : qc(c.name) }.join(", ")
+        column_list = columns.map { |c| (c.respond_to?(:unindexed?) && c.unindexed?) ? "#{qc(column_name(c))} UNINDEXED" : qc(column_name(c)) }.join(", ")
 
         "CREATE VIRTUAL TABLE #{qt(trigram_table_name(model))} USING fts5(#{column_list}, tokenize='trigram');"
       end
@@ -390,7 +394,7 @@ module FullSearch
         where_clause = dsl.conditional_index? ? " WHERE (#{dsl.index_if_sql})" : ""
 
         <<~SQL
-          INSERT INTO #{qt(trigram_table_name(model))}(rowid, #{cols.map { |c| qc(c.name) }.join(", ")})
+          INSERT INTO #{qt(trigram_table_name(model))}(rowid, #{cols.map { |c| qc(column_name(c)) }.join(", ")})
           SELECT #{qt(model.table_name)}.id, #{select} FROM #{qt(model.table_name)}#{where_clause};
         SQL
       end
@@ -469,7 +473,7 @@ module FullSearch
       end
 
       def col_names(cols)
-        cols.map { |c| qc(c.name) }.join(", ")
+        cols.map { |c| qc(column_name(c)) }.join(", ")
       end
 
       def column_ref(col, prefix:)

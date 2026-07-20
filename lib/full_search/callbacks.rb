@@ -66,7 +66,7 @@ module FullSearch
       table = qt(FullSearch::Index.fts_table_name(record.class))
       conn = ActiveRecord::Base.connection
       conn.execute(
-        "UPDATE #{table} SET #{qc(field.name)} = #{q(value.to_s)} WHERE rowid = #{q(record.id)}"
+        "UPDATE #{table} SET #{qc(field.as || field.name)} = #{q(value.to_s)} WHERE rowid = #{q(record.id)}"
       )
     rescue => e
       raise unless e.message.include?("no such table")

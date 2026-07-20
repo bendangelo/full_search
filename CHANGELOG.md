@@ -26,6 +26,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `check_stale_config!` — raises `ConfigChangedError` when index config is out of date.
 - SQL injection safety, adapter, and stale-config test coverage.
 
+## 0.3.5 — 2026-07-20
+
+### Fixed
+
+- `as:` field option now controls FTS column naming in DDL, backfill SQL, triggers, and
+  reindex callbacks. Previously the option was accepted but ignored by the index layer,
+  so `field :vin_last8, as: :vin` created a column named `vin_last8` instead of `vin`.
+- `ensure_table!` no longer unconditionally stores the config hash, which masked DSL
+  drift detection. `store_config_hash!` now only runs when the table was actually created,
+  so `rebuild_if_needed!` correctly detects schema changes (e.g., field renames, weight
+  changes, `as:` updates) on subsequent calls.
+
+### Added
+
+- `Index.column_name(col)` helper for consistent alias-vs-name resolution across all
+  SQL generation paths.
+
 ## Unreleased
 
 ### Added

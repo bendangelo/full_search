@@ -180,4 +180,100 @@ class FullSearch::IndexTest < ActiveSupport::TestCase
       FullSearch::Index.drop!(model)
     end
   end
+
+  def test_fts_column_uses_as_alias
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name, weight: 5
+        field :computed, weight: 1, source: -> { "hello_#{first_name}" }, as: :greeting, async_source: false
+        filter :account_id, required: true
+      end
+    end
+    model.table_name = "customers"
+    account = Account.create!(name: "Acme")
+
+    begin
+      FullSearch::Index.rebuild!(model)
+      fts_table = FullSearch::Index.fts_table_name(model)
+
+      columns = ActiveRecord::Base.connection.execute("PRAGMA table_info(#{fts_table})").map { |r| r["name"] }
+      assert_includes columns, "greeting", "FTS DDL should create column with alias name"
+      refute_includes columns, "computed", "FTS DDL should not create column with field name"
+
+      record = model.create!(account_id: account.id, first_name: "Sam")
+      row1 = ActiveRecord::Base.connection.execute(
+        "SELECT greeting FROM #{fts_table} WHERE rowid = #{record.id}"
+      ).first
+      assert_equal "hello_Sam", row1["greeting"], "Backfill/trigger should write source value to alias column"
+
+      record.update!(first_name: "SamUpdated")
+      row2 = ActiveRecord::Base.connection.execute(
+        "SELECT greeting FROM #{fts_table} WHERE rowid = #{record.id}"
+      ).first
+      assert_equal "hello_SamUpdated", row2["greeting"], "Reindex callback should update alias column"
+    ensure
+      FullSearch::Index.drop!(model)
+      Customer.delete_all
+      Account.delete_all
+    end
+  end
+
+  def test_rebuild_if_needed_detects_stale_config_hash
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name, weight: 5
+        filter :account_id, required: true
+      end
+    end
+    model.table_name = "customers"
+
+    begin
+      FullSearch::Index.rebuild!(model)
+      refute FullSearch::Index.rebuild_if_needed!(model), "should be false when config matches"
+
+      ActiveRecord::Base.connection.execute(
+        "UPDATE full_search_index_versions SET config_hash = 'tampered' WHERE table_name = 'customers'"
+      )
+
+      assert FullSearch::Index.rebuild_if_needed!(model), "should detect stale config and trigger rebuild"
+    ensure
+      FullSearch::Index.drop!(model)
+      Customer.delete_all
+      Account.delete_all
+    end
+  end
+
+  def test_trigram_column_uses_as_alias
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name, weight: 5, as: :fname
+        field :last_name, weight: 5
+        filter :account_id, required: true
+        tokenize "trigram"
+        typo_tolerance
+      end
+    end
+    model.table_name = "customers"
+    account = Account.create!(name: "Acme")
+
+    begin
+      record = model.create!(account_id: account.id, first_name: "Sam", last_name: "Smith")
+      FullSearch::Index.rebuild!(model)
+
+      trigram_table = FullSearch::Index.trigram_table_name(model)
+      columns = ActiveRecord::Base.connection.execute("PRAGMA table_info(#{trigram_table})").map { |r| r["name"] }
+      assert_includes columns, "fname", "Trigram DDL should use alias column name"
+      refute_includes columns, "first_name", "Trigram DDL should not use field name"
+
+      row = ActiveRecord::Base.connection.execute(
+        "SELECT fname, last_name FROM #{trigram_table} WHERE rowid = #{record.id}"
+      ).first
+      assert_equal "Sam", row["fname"], "Trigram backfill should write value to alias column"
+      assert_equal "Smith", row["last_name"]
+    ensure
+      FullSearch::Index.drop!(model)
+      Customer.delete_all
+      Account.delete_all
+    end
+  end
 end
