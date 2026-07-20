@@ -91,4 +91,14 @@ class FullSearch::DslTest < ActiveSupport::TestCase
     assert_includes error.message, "Customer"
     assert_includes error.message, "conflicts"
   end
+
+  def test_field_async_source_defaults_to_config
+    @dsl.field :first_name, source: -> { full_name }
+    assert_equal true, @dsl.fields.first.async_source
+  end
+
+  def test_field_async_source_can_be_disabled
+    @dsl.field :first_name, source: -> { full_name }, async_source: false
+    assert_equal false, @dsl.fields.first.async_source
+  end
 end

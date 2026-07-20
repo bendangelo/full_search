@@ -4,7 +4,7 @@ module FullSearch
   class Dsl
     attr_reader :fields, :exact_matches, :filters, :model_class, :highlight_config, :rank_bys
 
-    Field = Data.define(:name, :weight, :source, :reindex_on, :async, :as, :version)
+    Field = Data.define(:name, :weight, :source, :reindex_on, :async, :async_source, :as, :version)
     ExactMatch = Data.define(:name, :source, :version)
     Filter = Data.define(:name, :required)
     RankBy = Data.define(:column, :direction)
@@ -19,7 +19,10 @@ module FullSearch
       @soft_delete_column = nil
     end
 
-    def field(name, weight: 1, source: nil, reindex_on: nil, async: FullSearch.config.default_async_reindex, as: nil, version: nil)
+    def field(name, weight: 1, source: nil, reindex_on: nil,
+              async: FullSearch.config.default_async_reindex,
+              async_source: FullSearch.config.default_async_source_reindex,
+              as: nil, version: nil)
       unless valid_name?(name)
         raise InvalidFieldError, "#{model_class.name}: invalid field name #{name.inspect}"
       end
@@ -29,7 +32,11 @@ module FullSearch
       str = name.to_s
       raise InvalidFieldError, "#{model_class.name}: duplicate field name #{name.inspect}" if fields.any? { |f| f.name == str }
       raise InvalidFieldError, "#{model_class.name}: field name #{name.inspect} conflicts with existing filter" if filters.any? { |f| f.name == str }
-      @fields << Field.new(name: str, weight: weight.to_i, source: source, reindex_on: reindex_on&.to_s, async: async, as: as&.to_s, version: version)
+      @fields << Field.new(
+        name: str, weight: weight.to_i, source: source,
+        reindex_on: reindex_on&.to_s, async: async,
+        async_source: async_source, as: as&.to_s, version: version
+      )
     end
 
     def exact_match(name, source: -> { public_send(name) }, version: nil)
@@ -105,7 +112,7 @@ module FullSearch
         soft_delete_column,
         typo_tolerance?,
         typo_tolerance_min_term_length,
-        fields.map { |f| [f.name, f.weight, f.source.nil? ? "column" : "proc:#{f.version}", f.reindex_on, f.async, f.as] },
+        fields.map { |f| [f.name, f.weight, f.source.nil? ? "column" : "proc:#{f.version}", f.reindex_on, f.async, f.async_source, f.as] },
         exact_matches.map { |e| [e.name, "proc:#{e.version}"] },
         filters.map { |f| [f.name, f.required] },
         rank_bys.map { |r| [r.column, r.direction] }

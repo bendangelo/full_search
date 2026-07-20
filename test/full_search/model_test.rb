@@ -105,7 +105,7 @@ class FullSearch::ModelTest < ActiveSupport::TestCase
   end
 
   def test_source_block_error_includes_field_context
-    field = FullSearch::Dsl::Field.new(name: "bad", weight: 1, source: -> { missing_method }, reindex_on: nil, async: false, as: nil, version: nil)
+    field = FullSearch::Dsl::Field.new(name: "bad", weight: 1, source: -> { missing_method }, reindex_on: nil, async: false, async_source: true, as: nil, version: nil)
     record = Customer.new(account_id: 1, first_name: "Sam")
 
     error = assert_raises(NameError) do

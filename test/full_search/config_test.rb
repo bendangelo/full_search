@@ -33,4 +33,8 @@ class FullSearch::ConfigTest < ActiveSupport::TestCase
     FullSearch.config.auto_rebuild_schema = true
     assert_equal true, FullSearch.config.auto_rebuild_schema
   end
+
+  def test_default_async_source_reindex_is_true
+    assert_equal true, FullSearch.config.default_async_source_reindex
+  end
 end
