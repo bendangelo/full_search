@@ -17,6 +17,29 @@ def resolve_full_search_models(args)
 end
 
 namespace :full_search do
+  desc "Create full_search FTS tables and triggers if missing (idempotent, safe for first deploy)"
+  task :prepare, [:models] => :environment do |_t, args|
+    Rails.application.eager_load!
+
+    models = if args[:models]
+      args[:models].split(",").map do |name|
+        klass = begin
+          name.singularize.camelize.constantize
+        rescue NameError, LoadError
+          FullSearch.models.find { |m| m.table_name == name }
+        end
+        klass
+      end.compact
+    else
+      FullSearch.models
+    end
+
+    FullSearch.setup!
+    models.each do |model|
+      puts "Prepared #{FullSearch::Index.fts_table_name(model)}"
+    end
+  end
+
   desc "Rebuild indexes when DSL has changed (checks config hash; safe for production)"
   task :rebuild, [:models] => :environment do |_t, args|
     Rails.application.eager_load!

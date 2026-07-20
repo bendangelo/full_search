@@ -78,7 +78,15 @@ module FullSearch
     end
 
     def check_stale_config!
-      stored = FullSearch::Index.stored_config_hash(model)
+      if FullSearch::Index.missing_table?(model)
+        raise MissingTableError, "FTS table `#{FullSearch::Index.fts_table_name(model)}` does not exist. Run `bin/rails full_search:prepare` to create it."
+      end
+
+      stored = begin
+        FullSearch::Index.stored_config_hash(model)
+      rescue StandardError
+        nil
+      end
       return unless stored
 
       return if stored == dsl.config_hash

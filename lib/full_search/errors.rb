@@ -8,5 +8,6 @@ module FullSearch
   class InvalidFieldError < Error; end
   class NotConfiguredError < Error; end
   class UnsupportedDatabaseError < Error; end
+  class MissingTableError < Error; end
   class InvalidQueryError < Error; end
 end

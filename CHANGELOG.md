@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `MissingTableError` — raised when a search is attempted against a non-existent FTS table.
+- `Index.missing_table?(model)` — public predicate for checking FTS table existence.
+- `full_search:prepare` Rake task — idempotent setup that creates missing FTS tables and triggers without dropping existing ones. Safe to run on every deploy (e.g., Docker entrypoint).
+- `check_stale_config!` now raises `MissingTableError` with a clear action message when the FTS table is missing, instead of a cryptic SQL error.
+- Documentation for first-deploy setup, missing table error handling, and the `full_search:prepare` task in README.
 - GitHub Actions CI matrix testing Ruby 3.1, 3.2, 3.3 against Rails 8.0 and 8.1.
 - StandardRB linting via `rake standard` and `bin/lint`.
 - Gemspec signing metadata (`cert_chain`, `signing_key`) for future signed releases.

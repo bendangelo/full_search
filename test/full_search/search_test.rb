@@ -291,4 +291,18 @@ class FullSearch::SearchTest < ActiveSupport::TestCase
 
     assert results.to_a.size <= 5
   end
+
+  def test_raises_missing_table_error_when_fts_table_does_not_exist
+    FullSearch::Index.drop!(@customer_model)
+    assert FullSearch::Index.missing_table?(@customer_model)
+
+    account = Account.create!(name: "Acme")
+    @customer_model.create!(account_id: account.id, first_name: "Sammy")
+
+    assert_raises(FullSearch::MissingTableError) do
+      @customer_model.full_search("Sam", filters: {account_id: account.id})
+    end
+  ensure
+    FullSearch::Index.rebuild!(@customer_model)
+  end
 end

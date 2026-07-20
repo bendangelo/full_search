@@ -69,6 +69,16 @@ class FullSearch::IndexTest < ActiveSupport::TestCase
     refute FullSearch::Index.send(:table_exists?, @model)
   end
 
+  def test_missing_table_returns_true_when_table_does_not_exist
+    FullSearch::Index.drop!(@model)
+    assert FullSearch::Index.missing_table?(@model)
+  end
+
+  def test_missing_table_returns_false_when_table_exists
+    FullSearch::Index.ensure_table!(@model)
+    refute FullSearch::Index.missing_table?(@model)
+  end
+
   def test_ensure_table_is_idempotent
     FullSearch::Index.ensure_table!(@model)
     assert FullSearch::Index.send(:table_exists?, @model)

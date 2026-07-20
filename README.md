@@ -125,6 +125,22 @@ These two operations are often confused:
 > within the same process/connection. For multi-process or multi-host deployments,
 > run `full_search:rebuild` from a single deployment step.
 
+### First-deploy setup
+
+After `db:prepare` creates your application tables, FTS virtual tables like `customers_fts` do not yet exist. Run `full_search:prepare` to create them:
+
+```bash
+bin/rails full_search:prepare
+```
+
+For Docker-based deployments, add this to your entrypoint script after `db:prepare:with_data`:
+
+```bash
+./bin/rails full_search:prepare
+```
+
+The `full_search:prepare` task is idempotent — it only creates missing tables and installs triggers. It will not drop or rebuild existing indexes, making it safe to run on every deploy.
+
 ### Auto-rebuild on app load
 
 When `auto_rebuild_schema` is enabled (default in the generated initializer), the railtie hooks into Rails `after_initialize` and:
@@ -162,6 +178,7 @@ bin/rails full_search:reset
 
 | Task | Description |
 |------|-------------|
+| `full_search:prepare` | Idempotent setup — creates missing FTS tables and triggers without dropping existing ones. Safe to run on every deploy. Add to your Docker entrypoint after `db:prepare:with_data` for first-deploy automation. |
 | `full_search:rebuild` | Drops and recreates the FTS virtual table only when the DSL config hash has changed (safe for production). Pass model names to target specific tables. |
 | `full_search:reset` | Force a full rebuild — drops and recreates all FTS tables regardless of config hash. Use when data may be out of sync. |
 | `full_search:optimize` | Run FTS5 [`optimize`](https://www.sqlite.org/fts5.html#the_optimize_command) to merge b-tree segments. Useful after bulk updates. |
@@ -222,6 +239,17 @@ end
 ```
 
 When this option is `true`, the first search that detects a stale index automatically calls `FullSearch::Index.rebuild_if_needed!` and then proceeds with the query, so you don't need to restart the server or run a Rake task during iterative development. In production, this defaults to `false`; use `full_search:rebuild` or boot-time `auto_rebuild_schema` instead.
+
+### Missing table error
+
+When the FTS table does not exist and a search is attempted, `full_search` raises `MissingTableError` with a clear message:
+
+```
+FullSearch::MissingTableError: FTS table `customers_fts` does not exist.
+Run `bin/rails full_search:prepare` to create it.
+```
+
+This mirrors how Rails handles missing database tables — you see the error, run the task, and move on. Add `full_search:prepare` to your deploy pipeline or Docker entrypoint after `db:prepare:with_data` to prevent the error in production.
 
 ## Query operators
 

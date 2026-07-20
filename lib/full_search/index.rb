@@ -174,6 +174,10 @@ module FullSearch
         row&.[]("config_hash")
       end
 
+      def missing_table?(model)
+        !table_exists?(model)
+      end
+
       private
 
       def connection
