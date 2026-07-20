@@ -22,6 +22,8 @@ require "full_search/soft_delete"
 require "full_search/callbacks"
 require "full_search/reindex_job"
 require "full_search/optimize_job"
+require "full_search/bulk_import"
+require "full_search/backfill_job"
 require "full_search/test_helpers"
 require "full_search/multi_search"
 require "full_search/schema_dumper_patch"
@@ -53,6 +55,14 @@ module FullSearch
         Index.ensure_table!(model)
         Callbacks.install!(model)
       end
+    end
+
+    def bulk_import(model, &block)
+      BulkImport.bulk_import(model, &block)
+    end
+
+    def bulk_importing?(model)
+      BulkImport.bulk_importing?(model)
     end
   end
 end

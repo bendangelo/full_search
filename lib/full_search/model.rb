@@ -39,6 +39,14 @@ module FullSearch
       def reindex!
         FullSearch::Index.reindex_source_fields!(self)
       end
+
+      def bulk_import(&block)
+        FullSearch.bulk_import(self, &block)
+      end
+
+      def backfill_search_index!
+        FullSearch::BackfillJob.perform_later(name)
+      end
     end
 
     included do |base|

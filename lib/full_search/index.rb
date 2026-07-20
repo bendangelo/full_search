@@ -106,8 +106,33 @@ module FullSearch
       end
 
       def reindex_source_fields!(model)
+        dsl = model.full_search_dsl
+        return unless dsl
+
         model.find_each do |record|
-          FullSearch::Callbacks.reindex_record!(record)
+          dsl.fields.each do |field|
+            FullSearch::Callbacks.reindex_field!(record, field.name) if field.source
+          end
+        end
+      end
+
+      def create_triggers!(model)
+        connection.execute(insert_trigger_sql(model))
+        connection.execute(delete_trigger_sql(model))
+        connection.execute(update_trigger_sql(model))
+        if model.full_search_dsl.soft_delete_column
+          connection.execute(soft_delete_removal_trigger_sql(model))
+        end
+        if model.full_search_dsl.typo_tolerance?
+          connection.execute(insert_trigram_trigger_sql(model))
+          connection.execute(delete_trigram_trigger_sql(model))
+          connection.execute(update_trigram_trigger_sql(model))
+        end
+      end
+
+      def drop_triggers!(model)
+        (trigger_names(model) + trigram_trigger_names(model)).each do |name|
+          connection.execute("DROP TRIGGER IF EXISTS #{qt(name)};")
         end
       end
 
@@ -225,6 +250,8 @@ module FullSearch
       end
 
       def ensure_triggers!(model)
+        return if FullSearch.bulk_importing?(model)
+
         existing = connection.execute(
           "SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name=#{q(model.table_name)}"
         ).map { |r| r["name"] }
@@ -234,26 +261,6 @@ module FullSearch
         return if (expected - existing).empty? && (existing - expected).empty?
 
         rebuild!(model)
-      end
-
-      def create_triggers!(model)
-        connection.execute(insert_trigger_sql(model))
-        connection.execute(delete_trigger_sql(model))
-        connection.execute(update_trigger_sql(model))
-        if model.full_search_dsl.soft_delete_column
-          connection.execute(soft_delete_removal_trigger_sql(model))
-        end
-        if model.full_search_dsl.typo_tolerance?
-          connection.execute(insert_trigram_trigger_sql(model))
-          connection.execute(delete_trigram_trigger_sql(model))
-          connection.execute(update_trigram_trigger_sql(model))
-        end
-      end
-
-      def drop_triggers!(model)
-        (trigger_names(model) + trigram_trigger_names(model)).each do |name|
-          connection.execute("DROP TRIGGER IF EXISTS #{qt(name)};")
-        end
       end
 
       def trigger_names(model)

@@ -40,6 +40,16 @@ namespace :full_search do
     end
   end
 
+  desc "Backfill FTS indexes for given models (or all)"
+  task :backfill, [:models] => :environment do |_t, args|
+    Rails.application.eager_load!
+
+    resolve_full_search_models(args).each do |model|
+      FullSearch::BackfillJob.perform_now(model.name)
+      puts "Backfilled #{FullSearch::Index.fts_table_name(model)}"
+    end
+  end
+
   desc "Optimize full_search indexes"
   task optimize: :environment do
     Rails.application.eager_load!

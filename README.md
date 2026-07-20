@@ -126,6 +126,7 @@ bin/rails full_search:reset
 | `full_search:rebuild` | Drops and recreates the FTS virtual table only when the DSL config hash has changed (safe for production). Pass model names to target specific tables. |
 | `full_search:reset` | Force a full rebuild — drops and recreates all FTS tables regardless of config hash. Use when data may be out of sync. |
 | `full_search:optimize` | Run FTS5 [`optimize`](https://www.sqlite.org/fts5.html#the_optimize_command) to merge b-tree segments. Useful after bulk updates. |
+| `full_search:backfill` | Force-rebuild FTS indexes for specified models (or all). Useful for recovery after bulk operations. |
 | `full_search:status` | Show each model's index status (`ok` / `stale`) and count of empty sourced fields. |
 
 ## Background jobs
@@ -149,6 +150,27 @@ If you're not on Solid Queue, most job frameworks support recurring schedules vi
 ### Config hash drift detection
 
 Every FTS table stores a SHA256 digest of its DSL configuration in the `full_search_index_versions` table. When the DSL changes (e.g., adding a field), the stored hash no longer matches, and `rebuild!` is triggered automatically (if `auto_rebuild_schema` is true) to bring the index in line with the new definition. If `auto_rebuild_schema` is false, queries raise `ConfigChangedError` when the hash doesn't match (or log a warning and fall back if configured with `:log_and_fallback`).
+
+### Bulk imports
+
+When importing thousands of records, disable synchronous FTS maintenance and rebuild the index afterward:
+
+```ruby
+FullSearch.bulk_import(Customer) do
+  Customer.insert_all(records)
+end
+# automatically enqueues FullSearch::BackfillJob for Customer
+```
+
+While inside the block, database triggers are dropped so raw SQL operations (including `insert_all!`, `update_all`, and `delete_all`) bypass FTS table updates entirely. On exit, triggers are re-created and a `FullSearch::BackfillJob` is enqueued to rebuild the index from scratch. Reindexing of computed `source:` blocks within the block is also skipped.
+
+You can also call `Customer.bulk_import { ... }` directly on the model.
+
+For manual recovery outside a bulk-import block:
+
+```bash
+bin/rails 'full_search:backfill[customers]'
+```
 
 ### Query-time auto-rebuild in local environments
 

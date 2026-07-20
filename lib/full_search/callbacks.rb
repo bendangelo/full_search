@@ -10,11 +10,13 @@ module FullSearch
       source_fields = dsl.fields.select(&:source)
       return if source_fields.empty?
 
-      model.after_save do
+      model.after_save_commit do
+        next if FullSearch.bulk_importing?(self.class)
         FullSearch::Callbacks.reindex_record!(self)
       end
 
-      model.after_destroy do
+      model.after_destroy_commit do
+        next if FullSearch.bulk_importing?(self.class)
         FullSearch::Callbacks.remove_record!(self)
       end
 
@@ -22,10 +24,12 @@ module FullSearch
         next unless field.reindex_on
 
         assoc_class = associated_class(model, field.reindex_on)
-        assoc_class&.after_save do |record|
+        assoc_class&.after_save_commit do |record|
+          next if FullSearch.bulk_importing?(record.class)
           FullSearch::Callbacks.reindex_dependents!(record, model, field)
         end
-        assoc_class&.after_destroy do |record|
+        assoc_class&.after_destroy_commit do |record|
+          next if FullSearch.bulk_importing?(record.class)
           FullSearch::Callbacks.reindex_dependents!(record, model, field)
         end
       end
@@ -41,10 +45,15 @@ module FullSearch
       dsl = record.class.full_search_dsl
       return unless dsl
 
+      model_name = record.class.name
       dsl.fields.each do |field|
         next unless field.source
 
-        reindex_field!(record, field.name)
+        if model_name && field.async_source
+          FullSearch::ReindexJob.perform_later(model_name, record.id, field.name)
+        else
+          reindex_field!(record, field.name)
+        end
       end
     end
 
