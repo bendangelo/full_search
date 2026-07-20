@@ -108,7 +108,7 @@ class FullSearch::IndexTest < ActiveSupport::TestCase
     begin
       FullSearch::Index.rebuild!(model)
 
-      results = model.full_search("Keep", filters: { account_id: account.id })
+      results = model.full_search("Keep", filters: {account_id: account.id})
       assert_includes results.map(&:id), keep.id
       refute_includes results.map(&:id), drop.id if drop
 
@@ -139,7 +139,7 @@ class FullSearch::IndexTest < ActiveSupport::TestCase
 
       keep.update!(first_name: "Drop")
 
-      results = model.full_search("Keep", filters: { account_id: account.id })
+      results = model.full_search("Keep", filters: {account_id: account.id})
       refute_includes results.map(&:id), keep.id
 
       fts_count = ActiveRecord::Base.connection.execute(
@@ -169,7 +169,7 @@ class FullSearch::IndexTest < ActiveSupport::TestCase
 
       record.update!(first_name: "Keep")
 
-      results = model.full_search("Keep", filters: { account_id: account.id })
+      results = model.full_search("Keep", filters: {account_id: account.id})
       assert_includes results.map(&:id), record.id
 
       fts_count = ActiveRecord::Base.connection.execute(

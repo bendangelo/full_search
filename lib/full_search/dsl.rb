@@ -20,9 +20,9 @@ module FullSearch
     end
 
     def field(name, weight: 1, source: nil, reindex_on: nil,
-              async: FullSearch.config.default_async_reindex,
-              async_source: FullSearch.config.default_async_source_reindex,
-              as: nil, version: nil)
+      async: FullSearch.config.default_async_reindex,
+      async_source: FullSearch.config.default_async_source_reindex,
+      as: nil, version: nil)
       unless valid_name?(name)
         raise InvalidFieldError, "#{model_class.name}: invalid field name #{name.inspect}"
       end

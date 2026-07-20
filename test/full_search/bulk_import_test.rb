@@ -58,13 +58,13 @@ class FullSearch::BulkImportTest < ActiveSupport::TestCase
   def test_backfill_job_restores_index
     FullSearch.bulk_import(@model) do
       @model.insert_all!([
-        { account_id: @account.id, first_name: "Sam", created_at: Time.current, updated_at: Time.current }
+        {account_id: @account.id, first_name: "Sam", created_at: Time.current, updated_at: Time.current}
       ])
     end
 
     FullSearch::Index.rebuild!(@model)
 
-    results = @model.full_search("Sam", filters: { account_id: @account.id })
+    results = @model.full_search("Sam", filters: {account_id: @account.id})
     assert_equal 1, results.to_a.length
   end
 

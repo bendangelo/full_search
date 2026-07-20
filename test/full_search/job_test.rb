@@ -112,7 +112,7 @@ class FullSearch::JobTest < ActiveSupport::TestCase
 
     FullSearch::BackfillJob.perform_now(model.name)
 
-    results = model.full_search("Sam", filters: { account_id: account.id })
+    results = model.full_search("Sam", filters: {account_id: account.id})
     assert_equal [customer.id], results.to_a.map(&:id)
   ensure
     begin

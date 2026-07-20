@@ -67,4 +67,3 @@ class FullSearch::CallbacksTest < ActiveSupport::TestCase
     Object.send(:remove_const, :SyncSourceCustomer) if Object.const_defined?(:SyncSourceCustomer)
   end
 end
-
