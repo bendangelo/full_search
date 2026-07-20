@@ -114,7 +114,9 @@ module FullSearch
         "AND #{fts_table}.#{qc(name)} = #{q(value)}"
       end.join(" ")
 
-      connection.execute("#{sql} #{filter_conditions}").map { |r| r["id"] }
+      indexed_filter = dsl.conditional_index? ? " AND #{fts_table}.indexed = '1'" : ""
+
+      connection.execute("#{sql} #{filter_conditions}#{indexed_filter}").map { |r| r["id"] }
     end
 
     def trigram_match_ids(parsed, primary_ids, candidate_limit: nil)
@@ -144,7 +146,9 @@ module FullSearch
         "AND #{trigram_table}.#{qc(name)} = #{q(value)}"
       end.join(" ")
 
-      sql += filter_conditions
+      indexed_filter = dsl.conditional_index? ? " AND #{trigram_table}.indexed = '1'" : ""
+
+      sql += filter_conditions + indexed_filter
       order_and_limit!(sql, tbl, candidate_limit)
       connection.execute(sql).map { |r| r["id"] }
     end
@@ -158,6 +162,8 @@ module FullSearch
       if dsl.soft_delete_column && !include_soft_deleted
         soft_delete_clause = "AND #{tbl}.#{qc(dsl.soft_delete_column)} IS NULL"
       end
+
+      indexed_clause = dsl.conditional_index? ? "AND (#{dsl.index_if_sql}) " : ""
 
       ids = []
 
@@ -173,7 +179,7 @@ module FullSearch
         sql = <<~SQL
           SELECT #{tbl}.id
           FROM #{tbl}
-          WHERE (#{like_conditions}) #{filter_conditions} #{soft_delete_clause}
+          WHERE (#{like_conditions}) #{filter_conditions} #{soft_delete_clause} #{indexed_clause}
         SQL
 
         order_and_limit!(sql, tbl, candidate_limit)
@@ -191,11 +197,13 @@ module FullSearch
           "AND #{fts_table}.#{qc(name)} = #{q(value)}"
         end.join(" ")
 
+        fts_indexed = dsl.conditional_index? ? " AND #{fts_table}.indexed = '1'" : ""
+
         sql = <<~SQL
           SELECT #{tbl}.id
           FROM #{fts_table}
           JOIN #{tbl} ON #{tbl}.id = #{fts_table}.rowid
-          WHERE (#{like_conditions}) #{filter_conditions} #{soft_delete_clause}
+          WHERE (#{like_conditions}) #{filter_conditions} #{soft_delete_clause}#{fts_indexed}
         SQL
 
         order_and_limit!(sql, tbl, candidate_limit)
@@ -226,6 +234,8 @@ module FullSearch
         soft_delete_clause = "AND #{tbl}.#{qc(dsl.soft_delete_column)} IS NULL"
       end
 
+      indexed_clause = dsl.conditional_index? ? "AND (#{dsl.index_if_sql}) " : ""
+
       filter_conditions = filters.map do |name, value|
         "AND #{tbl}.#{qc(name)} = #{q(value)}"
       end.join(" ")
@@ -237,7 +247,7 @@ module FullSearch
       sql = <<~SQL
         SELECT #{tbl}.id
         FROM #{tbl}
-        WHERE (#{conditions}) #{filter_conditions} #{soft_delete_clause}
+        WHERE (#{conditions}) #{filter_conditions} #{soft_delete_clause} #{indexed_clause}
       SQL
 
       order_and_limit!(sql, tbl, candidate_limit)

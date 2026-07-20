@@ -90,4 +90,94 @@ class FullSearch::IndexTest < ActiveSupport::TestCase
     FullSearch::Index.rebuild!(@model)
     refute FullSearch::Index.rebuild_if_needed!(@model)
   end
+
+  def test_conditional_index_excludes_unmatched_rows
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name, weight: 5
+        filter :account_id, required: true
+        index_if sql: "first_name = 'Keep'"
+      end
+    end
+    model.table_name = "customers"
+
+    account = Account.create!(name: "Acme")
+    keep = model.create!(account_id: account.id, first_name: "Keep")
+    drop = model.create!(account_id: account.id, first_name: "Drop")
+
+    begin
+      FullSearch::Index.rebuild!(model)
+
+      results = model.full_search("Keep", filters: { account_id: account.id })
+      assert_includes results.map(&:id), keep.id
+      refute_includes results.map(&:id), drop.id if drop
+
+      fts_count = ActiveRecord::Base.connection.execute(
+        "SELECT COUNT(*) AS c FROM #{FullSearch::Index.fts_table_name(model)}"
+      ).first["c"]
+      assert_equal 1, fts_count
+    ensure
+      FullSearch::Index.drop!(model)
+    end
+  end
+
+  def test_conditional_index_update_removes_row_when_condition_fails
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name, weight: 5
+        filter :account_id, required: true
+        index_if sql: "first_name = 'Keep'"
+      end
+    end
+    model.table_name = "customers"
+
+    account = Account.create!(name: "Acme")
+    keep = model.create!(account_id: account.id, first_name: "Keep")
+
+    begin
+      FullSearch::Index.rebuild!(model)
+
+      keep.update!(first_name: "Drop")
+
+      results = model.full_search("Keep", filters: { account_id: account.id })
+      refute_includes results.map(&:id), keep.id
+
+      fts_count = ActiveRecord::Base.connection.execute(
+        "SELECT COUNT(*) AS c FROM #{FullSearch::Index.fts_table_name(model)}"
+      ).first["c"]
+      assert_equal 0, fts_count
+    ensure
+      FullSearch::Index.drop!(model)
+    end
+  end
+
+  def test_conditional_index_inserts_on_update_when_condition_now_true
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name, weight: 5
+        filter :account_id, required: true
+        index_if sql: "first_name = 'Keep'"
+      end
+    end
+    model.table_name = "customers"
+
+    account = Account.create!(name: "Acme")
+    record = model.create!(account_id: account.id, first_name: "Drop")
+
+    begin
+      FullSearch::Index.rebuild!(model)
+
+      record.update!(first_name: "Keep")
+
+      results = model.full_search("Keep", filters: { account_id: account.id })
+      assert_includes results.map(&:id), record.id
+
+      fts_count = ActiveRecord::Base.connection.execute(
+        "SELECT COUNT(*) AS c FROM #{FullSearch::Index.fts_table_name(model)}"
+      ).first["c"]
+      assert_equal 1, fts_count
+    ensure
+      FullSearch::Index.drop!(model)
+    end
+  end
 end

@@ -101,4 +101,22 @@ class FullSearch::DslTest < ActiveSupport::TestCase
     @dsl.field :first_name, source: -> { full_name }, async_source: false
     assert_equal false, @dsl.fields.first.async_source
   end
+
+  def test_index_if_records_sql
+    @dsl.index_if(sql: "status = 1")
+    assert_equal "status = 1", @dsl.index_if_sql
+    assert @dsl.conditional_index?
+  end
+
+  def test_conditional_index_false_by_default
+    refute @dsl.conditional_index?
+    assert_nil @dsl.index_if_sql
+  end
+
+  def test_config_hash_differs_with_conditional_index
+    dsl1 = FullSearch::Dsl.new(Customer)
+    dsl2 = FullSearch::Dsl.new(Customer)
+    dsl2.index_if(sql: "status = 1")
+    refute_equal dsl1.config_hash, dsl2.config_hash
+  end
 end

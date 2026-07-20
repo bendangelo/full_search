@@ -54,6 +54,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Committed `.ruby-lsp/` directory.
 - Committed `Gemfile.lock` from version control.
 
+## 0.3.4 — Conditional indexing
+
+### Added
+
+- `index_if` DSL directive — conditionally include records in the FTS index based on a SQL expression. Records that don't match the condition are excluded from search results entirely.
+
 ## 0.2.0
 
 - Initial public release with FTS5-backed full-text search, DSL, filters, highlighting, typo tolerance, and background jobs.

@@ -2,7 +2,7 @@
 
 module FullSearch
   class Dsl
-    attr_reader :fields, :exact_matches, :filters, :model_class, :highlight_config, :rank_bys
+    attr_reader :fields, :exact_matches, :filters, :model_class, :highlight_config, :rank_bys, :index_if_sql
 
     Field = Data.define(:name, :weight, :source, :reindex_on, :async, :async_source, :as, :version)
     ExactMatch = Data.define(:name, :source, :sql, :version)
@@ -91,6 +91,14 @@ module FullSearch
       @highlight_config = {open_tag: open_tag, close_tag: close_tag}
     end
 
+    def index_if(sql: nil)
+      @index_if_sql = sql&.to_s
+    end
+
+    def conditional_index?
+      @index_if_sql.present?
+    end
+
     def typo_tolerance(enabled = true, min_term_length: nil)
       @typo_tolerance = enabled
       @typo_tolerance_min_term_length = min_term_length || 3
@@ -112,6 +120,7 @@ module FullSearch
         soft_delete_column,
         typo_tolerance?,
         typo_tolerance_min_term_length,
+        index_if_sql,
         fields.map { |f| [f.name, f.weight, f.source.nil? ? "column" : "proc:#{f.version}", f.reindex_on, f.async, f.async_source, f.as] },
         exact_matches.map { |e| [e.name, "proc:#{e.version}", e.sql] },
         filters.map { |f| [f.name, f.required] },

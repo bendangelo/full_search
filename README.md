@@ -57,6 +57,24 @@ Customer.search("sam", filters: { account_id: 1 }).page(params[:page])
 - FTS5 `highlight()` support for result snippets
 - Opt-in trigram typo/substring fallback (requires SQLite >= 3.34)
 
+### Conditional indexing
+
+Use `index_if` to restrict which records are included in the FTS index. Records that don't match the SQL condition are excluded from search results entirely.
+
+```ruby
+class Customer < ApplicationRecord
+  full_search do
+    field :first_name, weight: 5
+    field :last_name,  weight: 5
+    filter :account_id, required: true
+
+    index_if sql: "active = 1 AND deleted_at IS NULL"
+  end
+end
+```
+
+This is enforced at the database level — the FTS virtual table only contains rows matching the condition, and triggers skip inserts/updates for non-matching records.
+
 ### Per-model operations
 
 Once a model declares `full_search`, you can call these class methods:
