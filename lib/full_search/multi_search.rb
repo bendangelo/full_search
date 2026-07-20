@@ -27,7 +27,9 @@ module FullSearch
           limit: raw_limit,
           offset: offset,
           highlight: group[:highlight],
-          highlight_fields: group[:highlight_fields]
+          highlight_fields: group[:highlight_fields],
+          matching_strategy: group[:matching_strategy],
+          per_strategy_limit: group[:per_strategy_limit]
         )
 
         relation = group[:scope].call(relation) if group[:scope]

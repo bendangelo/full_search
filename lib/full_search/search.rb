@@ -2,9 +2,9 @@
 
 module FullSearch
   class Search
-    attr_reader :model, :query, :filters, :include_soft_deleted, :limit, :offset, :highlight, :highlight_fields, :matching_strategy
+    attr_reader :model, :query, :filters, :include_soft_deleted, :limit, :offset, :highlight, :highlight_fields, :matching_strategy, :per_strategy_limit
 
-    def initialize(model, query, filters:, include_soft_deleted:, limit:, offset:, highlight: false, highlight_fields: false, matching_strategy: nil)
+    def initialize(model, query, filters:, include_soft_deleted:, limit:, offset:, highlight: false, highlight_fields: false, matching_strategy: nil, per_strategy_limit: nil)
       @model = model
       @query = query.to_s.strip
       @filters = filters
@@ -14,6 +14,7 @@ module FullSearch
       @highlight = highlight
       @highlight_fields = highlight_fields
       @matching_strategy = matching_strategy
+      @per_strategy_limit = per_strategy_limit
     end
 
     MIN_TERM_LENGTH = 3
@@ -28,8 +29,8 @@ module FullSearch
       parsed = QueryParser.parse(query)
       exact_ids = ExactMatch.ids_for(model, query, filters)
       primary_ids = fts_match_ids(parsed)
-      fallback_ids = (dsl.typo_tolerance? && matching_strategy != "all") ? trigram_match_ids(parsed, primary_ids) : []
-      fuzzy_ids = (dsl.typo_tolerance? && matching_strategy != "all" && primary_ids.empty? && fallback_ids.empty?) ? fuzzy_match_ids(parsed) : []
+      fallback_ids = (dsl.typo_tolerance? && matching_strategy != "all") ? trigram_match_ids(parsed, primary_ids, candidate_limit: per_strategy_limit) : []
+      fuzzy_ids = (dsl.typo_tolerance? && matching_strategy != "all" && primary_ids.empty? && fallback_ids.empty?) ? fuzzy_match_ids(parsed, candidate_limit: per_strategy_limit) : []
 
       all_ids = (exact_ids + primary_ids + fallback_ids + fuzzy_ids).uniq
       return model.none if all_ids.empty?
@@ -42,9 +43,13 @@ module FullSearch
       rel = apply_ranking(rel, all_ids, exact_ids)
 
       if highlight
-        Highlighter.apply!(rel.to_a, model, query)
+        records = rel.to_a
+        Highlighter.apply!(records, model, query, record_ids: records.map(&:id))
+        records
       elsif highlight_fields
-        Highlighter.apply_fields!(rel.to_a, model, query)
+        records = rel.to_a
+        Highlighter.apply_fields!(records, model, query, record_ids: records.map(&:id))
+        records
       else
         rel
       end
@@ -112,7 +117,7 @@ module FullSearch
       connection.execute("#{sql} #{filter_conditions}").map { |r| r["id"] }
     end
 
-    def trigram_match_ids(parsed, primary_ids)
+    def trigram_match_ids(parsed, primary_ids, candidate_limit: nil)
       return [] if primary_ids.any?
 
       match_expr = QueryParser.to_match_expression(parsed)
@@ -122,7 +127,7 @@ module FullSearch
       return [] if term.nil?
 
       if term.length < dsl.typo_tolerance_min_term_length.to_i
-        return like_prefix_ids(term)
+        return like_prefix_ids(term, candidate_limit: candidate_limit)
       end
 
       trigram_table = qt(FullSearch::Index.trigram_table_name(model))
@@ -139,10 +144,12 @@ module FullSearch
         "AND #{trigram_table}.#{qc(name)} = #{q(value)}"
       end.join(" ")
 
-      connection.execute("#{sql} #{filter_conditions}").map { |r| r["id"] }
+      sql += filter_conditions
+      order_and_limit!(sql, tbl, candidate_limit)
+      connection.execute(sql).map { |r| r["id"] }
     end
 
-    def like_prefix_ids(term)
+    def like_prefix_ids(term, candidate_limit: nil)
       column_fields = dsl.fields.select { |f| f.source.nil? }
       source_fields = dsl.fields.select { |f| f.source }
       tbl = qt(model.table_name)
@@ -169,6 +176,7 @@ module FullSearch
           WHERE (#{like_conditions}) #{filter_conditions} #{soft_delete_clause}
         SQL
 
+        order_and_limit!(sql, tbl, candidate_limit)
         ids = connection.execute(sql).map { |r| r["id"] }
         return ids if ids.any?
       end
@@ -190,13 +198,14 @@ module FullSearch
           WHERE (#{like_conditions}) #{filter_conditions} #{soft_delete_clause}
         SQL
 
+        order_and_limit!(sql, tbl, candidate_limit)
         ids = connection.execute(sql).map { |r| r["id"] }
       end
 
       ids
     end
 
-    def fuzzy_match_ids(parsed)
+    def fuzzy_match_ids(parsed, candidate_limit: nil)
       term = parsed.last
       return [] if term.nil?
 
@@ -231,7 +240,16 @@ module FullSearch
         WHERE (#{conditions}) #{filter_conditions} #{soft_delete_clause}
       SQL
 
+      order_and_limit!(sql, tbl, candidate_limit)
       connection.execute(sql).map { |r| r["id"] }
+    end
+
+    def order_and_limit!(sql, tbl, candidate_limit)
+      order_parts = dsl.rank_bys.map do |rank_by|
+        "#{tbl}.#{qc(rank_by.column)} #{rank_by.direction.to_s.upcase} NULLS LAST"
+      end
+      sql << " ORDER BY #{order_parts.join(", ")}" if order_parts.any?
+      sql << " LIMIT #{candidate_limit.to_i}" if candidate_limit
     end
 
     def max_allowed_typos(length)

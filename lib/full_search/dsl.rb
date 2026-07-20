@@ -5,7 +5,7 @@ module FullSearch
     attr_reader :fields, :exact_matches, :filters, :model_class, :highlight_config, :rank_bys
 
     Field = Data.define(:name, :weight, :source, :reindex_on, :async, :async_source, :as, :version)
-    ExactMatch = Data.define(:name, :source, :version)
+    ExactMatch = Data.define(:name, :source, :sql, :version)
     Filter = Data.define(:name, :required)
     RankBy = Data.define(:column, :direction)
 
@@ -39,13 +39,13 @@ module FullSearch
       )
     end
 
-    def exact_match(name, source: -> { public_send(name) }, version: nil)
+    def exact_match(name, source: -> { public_send(name) }, sql: nil, version: nil)
       unless valid_name?(name)
         raise InvalidFieldError, "#{model_class.name}: invalid exact_match name #{name.inspect}"
       end
       str = name.to_s
       raise InvalidFieldError, "#{model_class.name}: duplicate exact_match name #{name.inspect}" if exact_matches.any? { |e| e.name == str }
-      @exact_matches << ExactMatch.new(name: str, source: source, version: version)
+      @exact_matches << ExactMatch.new(name: str, source: source, sql: sql&.to_s, version: version)
     end
 
     def rank_by(column, direction = :desc)
@@ -113,7 +113,7 @@ module FullSearch
         typo_tolerance?,
         typo_tolerance_min_term_length,
         fields.map { |f| [f.name, f.weight, f.source.nil? ? "column" : "proc:#{f.version}", f.reindex_on, f.async, f.async_source, f.as] },
-        exact_matches.map { |e| [e.name, "proc:#{e.version}"] },
+        exact_matches.map { |e| [e.name, "proc:#{e.version}", e.sql] },
         filters.map { |f| [f.name, f.required] },
         rank_bys.map { |r| [r.column, r.direction] }
       ].inspect)

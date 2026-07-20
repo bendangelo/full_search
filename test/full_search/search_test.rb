@@ -245,4 +245,50 @@ class FullSearch::SearchTest < ActiveSupport::TestCase
     results = @customer_model.full_search("Sam", filters: {account_id: nil})
     assert_empty results.to_a
   end
+
+  def test_highlighter_restricts_to_returned_record_ids
+    account = Account.create!(name: "Acme")
+    10.times { |i| @customer_model.create!(account_id: account.id, first_name: "Sam#{i}") }
+    FullSearch::Index.rebuild!(@customer_model)
+
+    results = @customer_model.full_search(
+      "Sam",
+      filters: {account_id: account.id},
+      limit: 2,
+      highlight_fields: true,
+      per_strategy_limit: 2
+    )
+
+    assert_equal 2, results.size
+    results.each do |record|
+      assert record.full_search_highlight_fields.key?("first_name")
+      assert_includes record.full_search_highlight_fields["first_name"], "<mark>"
+    end
+  end
+
+  def test_fuzzy_respects_per_strategy_limit
+    account = Account.create!(name: "Acme")
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name, weight: 5
+        field :last_name, weight: 5
+        filter :account_id, required: true
+        typo_tolerance
+        rank_by :updated_at, :desc
+      end
+    end
+    model.table_name = "customers"
+    20.times do |i|
+      model.create!(account_id: account.id, first_name: "Smyth", last_name: "Doe", updated_at: Time.current - i.seconds)
+    end
+    FullSearch::Index.rebuild!(model)
+
+    results = model.full_search(
+      "Smith",
+      filters: {account_id: account.id},
+      per_strategy_limit: 5
+    )
+
+    assert results.to_a.size <= 5
+  end
 end

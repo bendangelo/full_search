@@ -62,6 +62,40 @@ class FullSearch::ExactMatchTest < ActiveSupport::TestCase
     assert_includes ids, vehicle.id
   end
 
+  def test_sql_exact_match_finds_record
+    search_model = Class.new(Vehicle) do
+      full_search do
+        exact_match :make, source: -> { make&.upcase }, sql: "UPPER(make)"
+        filter :account_id, required: true
+      end
+    end
+    search_model.table_name = "vehicles"
+
+    FullSearch::Index.rebuild!(search_model)
+
+    vehicle = Vehicle.create!(account_id: @account.id, make: "Honda")
+
+    ids = FullSearch::ExactMatch.ids_for(search_model, "HONDA", {account_id: @account.id})
+    assert_includes ids, vehicle.id
+  end
+
+  def test_sql_exact_match_case_insensitive
+    search_model = Class.new(Vehicle) do
+      full_search do
+        exact_match :make, source: -> { make&.upcase }, sql: "UPPER(make)"
+        filter :account_id, required: true
+      end
+    end
+    search_model.table_name = "vehicles"
+
+    FullSearch::Index.rebuild!(search_model)
+
+    vehicle = Vehicle.create!(account_id: @account.id, make: "honda")
+
+    ids = FullSearch::ExactMatch.ids_for(search_model, "HONDA", {account_id: @account.id})
+    assert_includes ids, vehicle.id
+  end
+
   def test_exact_match_on_encrypted_column
     search_model = Class.new(Vehicle) do
       full_search do

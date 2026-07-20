@@ -171,4 +171,29 @@ class FullSearch::MultiSearchTest < ActiveSupport::TestCase
     assert record.respond_to?(:full_search_highlight_fields)
     assert_includes record.full_search_highlight_fields["first_name"], "<mark>"
   end
+
+  def test_applies_per_strategy_limit
+    account = Account.create!(name: "Acme")
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name, weight: 5
+        filter :account_id, required: true
+        typo_tolerance
+      end
+    end
+    model.table_name = "customers"
+    20.times { model.create!(account_id: account.id, first_name: "Smyth") }
+    FullSearch::Index.rebuild!(model)
+
+    result = FullSearch.multi_search(
+      query: "Smith",
+      groups: [
+        {key: :customers, label: "Customers", model: model,
+         filters: {account_id: account.id}, limit: 8, per_strategy_limit: 5}
+      ]
+    )
+
+    group = result[:groups].first
+    assert group[:results].size <= 5
+  end
 end

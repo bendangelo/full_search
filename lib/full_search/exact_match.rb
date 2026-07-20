@@ -9,16 +9,34 @@ module FullSearch
       cleaned = query.to_s.strip
       return [] if cleaned.empty?
 
-      relation = model.all
-      filters.each { |name, value| relation = relation.where(name => value) }
+      sql_matches = dsl.exact_matches.select(&:sql)
+      ruby_matches = dsl.exact_matches.reject(&:sql)
 
       ids = []
-      relation.find_each do |record|
-        dsl.exact_matches.each do |em|
-          value = record.instance_exec(&em.source)
-          ids << record.id if value.to_s.casecmp?(cleaned)
+
+      if sql_matches.any?
+        base = model.all
+        filters.each { |name, value| base = base.where(name => value) }
+
+        conditions = sql_matches.map do |em|
+          "(#{em.sql}) = #{model.connection.quote(cleaned)}"
+        end.join(" OR ")
+
+        ids += base.where(conditions).pluck(:id)
+      end
+
+      if ruby_matches.any?
+        base = model.all
+        filters.each { |name, value| base = base.where(name => value) }
+
+        base.find_each do |record|
+          ruby_matches.each do |em|
+            value = record.instance_exec(&em.source)
+            ids << record.id if value.to_s.casecmp?(cleaned)
+          end
         end
       end
+
       ids.uniq
     end
   end

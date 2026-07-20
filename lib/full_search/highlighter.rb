@@ -3,8 +3,8 @@
 module FullSearch
   class Highlighter
     class << self
-      def apply!(records, model, query)
-        snippets = build_snippets(model, query)
+      def apply!(records, model, query, record_ids: nil)
+        snippets = build_snippets(model, query, record_ids: record_ids)
         if snippets.values.all?(&:nil?) && records.any?
           snippets = manual_snippets(records, model, query)
         end
@@ -12,8 +12,8 @@ module FullSearch
         records
       end
 
-      def apply_fields!(records, model, query)
-        fields = build_field_snippets(model, query)
+      def apply_fields!(records, model, query, record_ids: nil)
+        fields = build_field_snippets(model, query, record_ids: record_ids)
         if fields.values.all?(&:empty?) && records.any?
           fields = manual_field_snippets(records, model, query)
         end
@@ -28,8 +28,8 @@ module FullSearch
 
       private
 
-      def build_snippets(model, query)
-        rows = highlight_rows(model, query)
+      def build_snippets(model, query, record_ids: nil)
+        rows = highlight_rows(model, query, record_ids: record_ids)
         cols = model.full_search_dsl.fields.map(&:name)
 
         rows.to_h do |row|
@@ -38,8 +38,8 @@ module FullSearch
         end
       end
 
-      def build_field_snippets(model, query)
-        rows = highlight_rows(model, query)
+      def build_field_snippets(model, query, record_ids: nil)
+        rows = highlight_rows(model, query, record_ids: record_ids)
         dsl = model.full_search_dsl
         fields = dsl.fields
         open_tag = (dsl.highlight_config || {open_tag: "<mark>"})[:open_tag]
@@ -175,7 +175,7 @@ module FullSearch
         1
       end
 
-      def highlight_rows(model, query)
+      def highlight_rows(model, query, record_ids: nil)
         dsl = model.full_search_dsl
         config = dsl.highlight_config || {open_tag: "<mark>", close_tag: "</mark>"}
         match_expr = QueryParser.to_match_expression(QueryParser.parse(query))
@@ -194,6 +194,10 @@ module FullSearch
           FROM #{table}
           WHERE #{table} MATCH #{q(match_expr)}
         SQL
+
+        if record_ids.present?
+          sql += " AND rowid IN (#{record_ids.map { |id| connection.quote(id) }.join(", ")})"
+        end
 
         connection.execute(sql)
       end
