@@ -84,7 +84,7 @@ module FullSearch
 
       stored = begin
         FullSearch::Index.stored_config_hash(model)
-      rescue
+      rescue StandardError
         nil
       end
       return unless stored

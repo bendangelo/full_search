@@ -5,7 +5,7 @@ module FullSearch
     attr_reader :fields, :exact_matches, :filters, :model_class, :highlight_config, :rank_bys, :index_if_sql
 
     Field = Data.define(:name, :weight, :source, :reindex_on, :async, :async_source, :as, :version)
-    ExactMatch = Data.define(:name, :source, :sql, :version)
+    ExactMatch = Data.define(:name, :source, :sql, :version, :normalize)
     Filter = Data.define(:name, :required)
     RankBy = Data.define(:column, :direction)
 
@@ -39,13 +39,13 @@ module FullSearch
       )
     end
 
-    def exact_match(name, source: -> { public_send(name) }, sql: nil, version: nil)
+    def exact_match(name, source: -> { public_send(name) }, sql: nil, normalize: nil, version: nil)
       unless valid_name?(name)
         raise InvalidFieldError, "#{model_class.name}: invalid exact_match name #{name.inspect}"
       end
       str = name.to_s
       raise InvalidFieldError, "#{model_class.name}: duplicate exact_match name #{name.inspect}" if exact_matches.any? { |e| e.name == str }
-      @exact_matches << ExactMatch.new(name: str, source: source, sql: sql&.to_s, version: version)
+      @exact_matches << ExactMatch.new(name: str, source: source, sql: sql&.to_s, normalize: normalize, version: version)
     end
 
     def rank_by(column, direction = :desc)

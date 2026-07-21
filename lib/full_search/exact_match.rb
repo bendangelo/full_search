@@ -19,7 +19,8 @@ module FullSearch
         filters.each { |name, value| base = base.where(name => value) }
 
         conditions = sql_matches.map do |em|
-          "(#{em.sql}) = #{model.connection.quote(cleaned)}"
+          value = em.normalize ? em.normalize.call(cleaned) : cleaned
+          "(#{em.sql}) = #{model.connection.quote(value)}"
         end.join(" OR ")
 
         ids += base.where(conditions).pluck(:id)

@@ -112,4 +112,23 @@ class FullSearch::ExactMatchTest < ActiveSupport::TestCase
     ids = FullSearch::ExactMatch.ids_for(search_model, "ABC-1234", {account_id: @account.id})
     assert_includes ids, vehicle.id
   end
+
+  def test_sql_exact_match_with_normalization
+    search_model = Class.new(Vehicle) do
+      full_search do
+        exact_match :vin,
+          sql: "UPPER(REPLACE(vin, '-', ''))",
+          normalize: ->(q) { q.to_s.upcase.delete("-") }
+        filter :account_id, required: true
+      end
+    end
+    search_model.table_name = "vehicles"
+
+    FullSearch::Index.rebuild!(search_model)
+
+    vehicle = Vehicle.create!(account_id: @account.id, vin: "1HG-1234")
+
+    ids = FullSearch::ExactMatch.ids_for(search_model, "1hg1234", {account_id: @account.id})
+    assert_includes ids, vehicle.id
+  end
 end
