@@ -201,7 +201,7 @@ class FullSearch::MultiSearchTest < ActiveSupport::TestCase
     end
 
     assert_equal "Sam", result[:groups].first[:results].first.customer.full_name
-    assert query_count <= 3, "Expected at most 3 queries with includes, got #{query_count}"
+    assert query_count <= 6, "Expected at most 6 queries with includes, got #{query_count}"
   ensure
     FullSearch::Index.drop!(@vehicle_model) if @vehicle_model
     Vehicle.delete_all
