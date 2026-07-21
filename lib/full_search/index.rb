@@ -55,6 +55,7 @@ module FullSearch
       end
 
       def rebuild!(model)
+        IndexCache.clear!
         sqlite!(model)
 
         dsl = model.full_search_dsl
@@ -83,6 +84,7 @@ module FullSearch
       end
 
       def rebuild_if_needed!(model)
+        IndexCache.clear!
         sqlite!(model)
 
         dsl = model.full_search_dsl
@@ -137,6 +139,7 @@ module FullSearch
       end
 
       def drop!(model)
+        IndexCache.clear!
         verified_tables.delete(model.table_name)
         sqlite!(model)
         drop_triggers!(model)
@@ -168,10 +171,12 @@ module FullSearch
       end
 
       def stored_config_hash(model)
-        row = connection.execute(
-          "SELECT config_hash FROM full_search_index_versions WHERE table_name=#{q(model.table_name)}"
-        ).first
-        row&.[]("config_hash")
+        IndexCache.fetch("stored_config_hash:#{model.table_name}") do
+          row = connection.execute(
+            "SELECT config_hash FROM full_search_index_versions WHERE table_name=#{q(model.table_name)}"
+          ).first
+          row&.[]("config_hash")
+        end
       end
 
       def missing_table?(model)
@@ -207,9 +212,11 @@ module FullSearch
       end
 
       def table_exists?(model)
-        connection.execute(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name=#{q(fts_table_name(model))} LIMIT 1"
-        ).any?
+        IndexCache.fetch("table_exists:#{model.table_name}") do
+          connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=#{q(fts_table_name(model))} LIMIT 1"
+          ).any?
+        end
       end
 
       def create_metadata_table!
