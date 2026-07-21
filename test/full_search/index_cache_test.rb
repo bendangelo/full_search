@@ -15,7 +15,10 @@ class FullSearch::IndexCacheTest < ActiveSupport::TestCase
     calls = 0
     FullSearch::IndexCache.with_cache do
       2.times do
-        FullSearch::IndexCache.fetch("key") { calls += 1; "value" }
+        FullSearch::IndexCache.fetch("key") {
+          calls += 1
+          "value"
+        }
       end
     end
     assert_equal 1, calls
@@ -23,7 +26,10 @@ class FullSearch::IndexCacheTest < ActiveSupport::TestCase
 
   def test_fetch_runs_block_without_cache
     calls = 0
-    value = FullSearch::IndexCache.fetch("key") { calls += 1; "value" }
+    value = FullSearch::IndexCache.fetch("key") {
+      calls += 1
+      "value"
+    }
     assert_equal "value", value
     assert_equal 1, calls
   end
@@ -44,9 +50,15 @@ class FullSearch::IndexCacheTest < ActiveSupport::TestCase
   def test_clear_resets_cache
     calls = 0
     FullSearch::IndexCache.with_cache do
-      FullSearch::IndexCache.fetch("key") { calls += 1; "value" }
+      FullSearch::IndexCache.fetch("key") {
+        calls += 1
+        "value"
+      }
       FullSearch::IndexCache.clear!
-      FullSearch::IndexCache.fetch("key") { calls += 1; "value2" }
+      FullSearch::IndexCache.fetch("key") {
+        calls += 1
+        "value2"
+      }
     end
     assert_equal 2, calls
   end

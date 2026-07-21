@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Index.column_name(col)` helper for consistent alias-vs-name resolution across all
   SQL generation paths.
 
-## Unreleased
+## 0.3.6 — 2026-07-21
 
 ### Added
 
@@ -75,6 +75,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Committed `.gem` files from `pkg/`.
 - Committed `.ruby-lsp/` directory.
 - Committed `Gemfile.lock` from version control.
+
+## Unreleased
+
+### Added
+
+- `full_search:install` generator now automatically runs `full_search:prepare` after creating the initializer.
+- `--skip-prepare` flag on `full_search:install` to skip automatic FTS table creation.
+- Generator gracefully skips `full_search:prepare` with a warning if the database isn't ready yet.
+
+### Changed
+
+- README "Installation" section now documents automatic `full_search:prepare` and the `--skip-prepare` flag.
 
 ## 0.3.4 — Conditional indexing
 

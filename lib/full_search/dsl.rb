@@ -2,7 +2,7 @@
 
 module FullSearch
   class Dsl
-    attr_reader :fields, :exact_matches, :filters, :model_class, :highlight_config, :rank_bys, :index_if_sql, :min_like_prefix_length
+    attr_reader :fields, :exact_matches, :filters, :model_class, :highlight_config, :rank_bys, :index_if_sql
 
     Field = Data.define(:name, :weight, :source, :reindex_on, :async, :async_source, :as, :version)
     ExactMatch = Data.define(:name, :source, :sql, :version, :normalize)

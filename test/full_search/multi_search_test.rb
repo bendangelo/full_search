@@ -182,7 +182,7 @@ class FullSearch::MultiSearchTest < ActiveSupport::TestCase
       end
     end
     @vehicle_model.table_name = "vehicles"
-    vehicle = @vehicle_model.create!(account_id: account.id, make: "Honda", customer_id: customer.id)
+    @vehicle_model.create!(account_id: account.id, make: "Honda", customer_id: customer.id)
     FullSearch::Index.rebuild!(@vehicle_model)
 
     query_count = 0
@@ -218,7 +218,10 @@ class FullSearch::MultiSearchTest < ActiveSupport::TestCase
       groups: [
         {key: :customers, label: "Customers", model: @customer_model,
          filters: {account_id: account.id},
-         scope: ->(rel) { called = true; rel.where(last_name: "Smith") }}
+         scope: ->(rel) {
+           called = true
+           rel.where(last_name: "Smith")
+         }}
       ]
     )
 

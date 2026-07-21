@@ -29,6 +29,13 @@ bundle install
 bin/rails generate full_search:install
 ```
 
+This creates the initializer and automatically runs `full_search:prepare` to create FTS tables.
+Use `--skip-prepare` if your database isn't ready yet:
+
+```bash
+bin/rails generate full_search:install --skip-prepare
+```
+
 ## Usage
 
 ```ruby
