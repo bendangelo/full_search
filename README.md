@@ -96,6 +96,34 @@ end
 
 This is enforced at the database level — the FTS virtual table only contains rows matching the condition, and triggers skip inserts/updates for non-matching records.
 
+### Exact match
+
+For exact-match lookups on encrypted identifiers or fields that need precise matching outside the FTS tokenizer, use `exact_match`:
+
+```ruby
+class Customer < ApplicationRecord
+  full_search do
+    field :first_name, weight: 5
+    filter :account_id, required: true
+
+    exact_match :customer_number
+  end
+end
+```
+
+```ruby
+Customer.search("CUST-001", filters: { account_id: 1 })
+# same query but only returns exact matches on customer_number
+```
+
+For case- or punctuation-normalized SQL exact matches, pass a `normalize` lambda that transforms the query the same way the SQL expression transforms the column:
+
+```ruby
+exact_match :license_plate,
+  sql: "UPPER(REPLACE(REPLACE(license_plate, ' ', ''), '-', ''))",
+  normalize: ->(q) { q.to_s.upcase.gsub(/[ -]/, "") }
+```
+
 ### Per-model operations
 
 Once a model declares `full_search`, you can call these class methods:
@@ -287,6 +315,44 @@ end
 ```
 
 `typo_tolerance` uses an FTS5 trigram shadow table as a fallback when the primary index returns no results. It is substring/trigram fallback, not edit-distance correction, and requires SQLite >= 3.34.
+
+You can disable the expensive `LIKE 'term%'` fallback for very short queries:
+
+```ruby
+full_search do
+  typo_tolerance
+  min_like_prefix_length 3
+end
+```
+
+## Multi-search
+
+Search across multiple models in a single call with `FullSearch.multi_search`:
+
+```ruby
+results = FullSearch.multi_search(
+  query: "Honda",
+  groups: [
+    {key: :customers, label: "Customers", model: Customer, filters: {account_id: 1}},
+    {key: :vehicles,  label: "Vehicles",  model: Vehicle,  filters: {account_id: 1}}
+  ]
+)
+
+results[:customers] #=> [#<Customer...>, ...]
+results[:vehicles]  #=> [#<Vehicle...>, ...]
+```
+
+Pass `includes:` to eager-load associations for each group:
+
+```ruby
+FullSearch.multi_search(
+  query: "Honda",
+  groups: [
+    {key: :vehicles, label: "Vehicles", model: Vehicle,
+     filters: {account_id: 1}, includes: [:customer]}
+  ]
+)
+```
 
 ## Known limitations
 
