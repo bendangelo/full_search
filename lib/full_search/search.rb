@@ -2,9 +2,9 @@
 
 module FullSearch
   class Search
-    attr_reader :model, :query, :filters, :include_soft_deleted, :limit, :offset, :highlight, :highlight_fields, :matching_strategy, :per_strategy_limit
+    attr_reader :model, :query, :filters, :include_soft_deleted, :limit, :offset, :highlight, :highlight_fields, :matching_strategy, :per_strategy_limit, :scope, :includes
 
-    def initialize(model, query, filters:, include_soft_deleted:, limit:, offset:, highlight: false, highlight_fields: false, matching_strategy: nil, per_strategy_limit: nil)
+    def initialize(model, query, filters:, include_soft_deleted:, limit:, offset:, highlight: false, highlight_fields: false, matching_strategy: nil, per_strategy_limit: nil, scope: nil, includes: nil)
       @model = model
       @query = query.to_s.strip
       @filters = filters
@@ -15,6 +15,8 @@ module FullSearch
       @highlight_fields = highlight_fields
       @matching_strategy = matching_strategy
       @per_strategy_limit = per_strategy_limit
+      @scope = scope
+      @includes = includes
     end
 
     MIN_TERM_LENGTH = 3
@@ -41,6 +43,8 @@ module FullSearch
       rel = rel.offset(offset) if offset
 
       rel = apply_ranking(rel, all_ids, exact_ids)
+      rel = scope.call(rel) if scope
+      rel = rel.includes(includes) if includes
 
       if highlight
         records = rel.to_a

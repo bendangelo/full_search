@@ -5,7 +5,7 @@ module FullSearch
     extend ActiveSupport::Concern
 
     class_methods do
-      def full_search(query_or_options = nil, filters: {}, include_soft_deleted: false, limit: nil, offset: nil, highlight: false, highlight_fields: false, matching_strategy: nil, per_strategy_limit: nil, &block)
+      def full_search(query_or_options = nil, filters: {}, include_soft_deleted: false, limit: nil, offset: nil, highlight: false, highlight_fields: false, matching_strategy: nil, per_strategy_limit: nil, scope: nil, includes: nil, &block)
         if block_given? || query_or_options.is_a?(Hash)
           @full_search_dsl ||= FullSearch::Dsl.new(self)
           @full_search_dsl.tokenize(query_or_options[:tokenize]) if query_or_options.is_a?(Hash) && query_or_options.key?(:tokenize)
@@ -16,7 +16,7 @@ module FullSearch
           FullSearch.register_model(self)
           @full_search_dsl
         else
-          FullSearch::Search.new(self, query_or_options, filters: filters, include_soft_deleted: include_soft_deleted, limit: limit, offset: offset, highlight: highlight, highlight_fields: highlight_fields, matching_strategy: matching_strategy, per_strategy_limit: per_strategy_limit).relation
+          FullSearch::Search.new(self, query_or_options, filters: filters, include_soft_deleted: include_soft_deleted, limit: limit, offset: offset, highlight: highlight, highlight_fields: highlight_fields, matching_strategy: matching_strategy, per_strategy_limit: per_strategy_limit, scope: scope, includes: includes).relation
         end
       end
 

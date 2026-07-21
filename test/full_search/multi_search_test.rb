@@ -172,6 +172,60 @@ class FullSearch::MultiSearchTest < ActiveSupport::TestCase
     assert_includes record.full_search_highlight_fields["first_name"], "<mark>"
   end
 
+  def test_applies_includes_to_avoid_n_plus_one
+    account = Account.create!(name: "Acme")
+    customer = Customer.create!(account_id: account.id, first_name: "Sam")
+    @vehicle_model = Class.new(Vehicle) do
+      full_search do
+        field :make, weight: 5
+        filter :account_id, required: true
+      end
+    end
+    @vehicle_model.table_name = "vehicles"
+    vehicle = @vehicle_model.create!(account_id: account.id, make: "Honda", customer_id: customer.id)
+    FullSearch::Index.rebuild!(@vehicle_model)
+
+    query_count = 0
+    callback = ->(*) { query_count += 1 }
+
+    result = nil
+    ActiveSupport::Notifications.subscribed(callback, "sql.active_record") do
+      result = FullSearch.multi_search(
+        query: "Honda",
+        groups: [
+          {key: :vehicles, label: "Vehicles", model: @vehicle_model,
+           filters: {account_id: account.id}, includes: [:customer]}
+        ]
+      )
+      result[:groups].first[:results].first.customer.full_name
+    end
+
+    assert_equal "Sam", result[:groups].first[:results].first.customer.full_name
+    assert query_count < 10, "Expected fewer than 10 queries, got #{query_count}"
+  ensure
+    FullSearch::Index.drop!(@vehicle_model) if @vehicle_model
+    Vehicle.delete_all
+  end
+
+  def test_applies_scope_before_materializing
+    account = Account.create!(name: "Acme")
+    @customer_model.create!(account_id: account.id, first_name: "Sam", last_name: "Smith")
+    FullSearch::Index.rebuild!(@customer_model)
+
+    called = false
+    result = FullSearch.multi_search(
+      query: "Sam",
+      groups: [
+        {key: :customers, label: "Customers", model: @customer_model,
+         filters: {account_id: account.id},
+         scope: ->(rel) { called = true; rel.where(last_name: "Smith") }}
+      ]
+    )
+
+    assert called
+    assert_equal 1, result[:total_count]
+  end
+
   def test_applies_per_strategy_limit
     account = Account.create!(name: "Acme")
     model = Class.new(Customer) do

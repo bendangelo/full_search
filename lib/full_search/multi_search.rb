@@ -29,10 +29,10 @@ module FullSearch
           highlight: group[:highlight],
           highlight_fields: group[:highlight_fields],
           matching_strategy: group[:matching_strategy],
-          per_strategy_limit: group[:per_strategy_limit]
+          per_strategy_limit: group[:per_strategy_limit],
+          scope: group[:scope],
+          includes: group[:includes]
         )
-
-        relation = group[:scope].call(relation) if group[:scope]
 
         records = relation.to_a
         has_more = records.size > limit
