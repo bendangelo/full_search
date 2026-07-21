@@ -82,6 +82,7 @@ class FullSearch::SearchTest < ActiveSupport::TestCase
         filter :account_id, required: true
         tokenize "trigram"
         typo_tolerance
+        min_like_prefix_length 2
       end
     end
     model.table_name = "customers"
@@ -290,6 +291,33 @@ class FullSearch::SearchTest < ActiveSupport::TestCase
     )
 
     assert results.to_a.size <= 5
+  end
+
+  def test_short_query_skips_like_prefix_fallback
+    account = Account.create!(name: "Acme")
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name, weight: 5
+        filter :account_id, required: true
+        typo_tolerance
+        min_like_prefix_length 3
+      end
+    end
+    model.table_name = "customers"
+    5.times { |i| model.create!(account_id: account.id, first_name: "bx#{i}") }
+    FullSearch::Index.rebuild!(model)
+
+    like_queries = []
+    callback = ->(name, started, finished, unique_id, payload) {
+      like_queries << payload[:sql] if payload[:sql]&.include?("LIKE")
+    }
+
+    ActiveSupport::Notifications.subscribed(callback, "sql.active_record") do
+      result = model.full_search("bx", filters: {account_id: account.id}, per_strategy_limit: 50)
+      assert result.any?
+    end
+
+    assert like_queries.none? { |sql| sql.include?("first_name LIKE") }
   end
 
   def test_raises_missing_table_error_when_fts_table_does_not_exist

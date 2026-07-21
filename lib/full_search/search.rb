@@ -39,11 +39,10 @@ module FullSearch
 
       rel = model.where(id: all_ids)
       rel = rel.where(model.arel_table[dsl.soft_delete_column].eq(nil)) if dsl.soft_delete_column && !include_soft_deleted
-      rel = rel.limit(limit) if limit
-      rel = rel.offset(offset) if offset
-
       rel = apply_ranking(rel, all_ids, exact_ids)
       rel = scope.call(rel) if scope
+      rel = rel.limit(limit) if limit
+      rel = rel.offset(offset) if offset
       rel = rel.includes(includes) if includes
 
       if highlight
@@ -141,6 +140,7 @@ module FullSearch
       return [] if term.nil?
 
       if term.length < dsl.typo_tolerance_min_term_length.to_i
+        return [] if term.length < dsl.min_like_prefix_length
         return like_prefix_ids(term, candidate_limit: candidate_limit)
       end
 
@@ -166,6 +166,8 @@ module FullSearch
     end
 
     def like_prefix_ids(term, candidate_limit: nil)
+      return [] if term.to_s.length < dsl.min_like_prefix_length
+
       column_fields = dsl.fields.select { |f| f.source.nil? }
       source_fields = dsl.fields.select { |f| f.source }
       tbl = qt(model.table_name)

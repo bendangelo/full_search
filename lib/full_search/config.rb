@@ -4,7 +4,7 @@ module FullSearch
   class Config
     attr_accessor :auto_rebuild_schema, :stale_query_behavior, :lock_rebuilds,
       :default_async_reindex, :default_async_source_reindex,
-      :default_tokenizer, :auto_rebuild_on_stale_query
+      :default_tokenizer, :auto_rebuild_on_stale_query, :min_like_prefix_length
 
     def initialize
       @auto_rebuild_schema = false
@@ -14,6 +14,7 @@ module FullSearch
       @default_async_source_reindex = true
       @default_tokenizer = "unicode61"
       @auto_rebuild_on_stale_query = false
+      @min_like_prefix_length = 3
     end
   end
 

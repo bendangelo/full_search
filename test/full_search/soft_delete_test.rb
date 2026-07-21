@@ -79,6 +79,7 @@ class FullSearch::SoftDeleteTest < ActiveSupport::TestCase
         typo_tolerance(min_term_length: 3)
         soft_delete_column :discarded_at
         tokenize "trigram"
+        min_like_prefix_length 2
       end
     end
     model.table_name = "customers"

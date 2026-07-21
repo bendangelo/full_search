@@ -101,6 +101,7 @@ class FullSearch::HighlightFieldsTest < ActiveSupport::TestCase
         filter :account_id, required: true
         tokenize "trigram"
         typo_tolerance
+        min_like_prefix_length 2
       end
     end
     model.table_name = "customers"
