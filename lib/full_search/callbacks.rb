@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "full_search/errors"
+
 module FullSearch
   module Callbacks
     def self.install!(model)
@@ -64,20 +66,20 @@ module FullSearch
 
       value = FullSearch::Model.evaluate_source(record, field)
       table = qt(FullSearch::Index.fts_table_name(record.class))
-      conn = ActiveRecord::Base.connection
+      conn = connection_for(record.class)
       conn.execute(
         "UPDATE #{table} SET #{qc(field.as || field.name)} = #{q(value.to_s)} WHERE rowid = #{q(record.id)}"
       )
-    rescue => e
-      raise unless e.message.include?("no such table")
+    rescue ActiveRecord::StatementInvalid => e
+      raise_missing_table_or_original(e, record.class)
     end
 
     def self.remove_record!(record)
       table = qt(FullSearch::Index.fts_table_name(record.class))
-      conn = ActiveRecord::Base.connection
+      conn = connection_for(record.class)
       conn.execute("DELETE FROM #{table} WHERE rowid = #{q(record.id)}")
-    rescue => e
-      raise unless e.message.include?("no such table")
+    rescue ActiveRecord::StatementInvalid => e
+      raise_missing_table_or_original(e, record.class)
     end
 
     def self.reindex_dependents!(parent_record, dependent_model, field)
@@ -113,5 +115,19 @@ module FullSearch
       reflection = model.reflect_on_association(association_name.to_sym)
       reflection&.foreign_key&.to_s || "#{association_name}_id"
     end
+
+    def self.connection_for(klass)
+      klass.connection
+    rescue NoMethodError
+      ActiveRecord::Base.connection
+    end
+
+    def self.raise_missing_table_or_original(error, _model_class)
+      if error.message.include?("no such table")
+        return
+      end
+      raise error
+    end
+    private_class_method :raise_missing_table_or_original
   end
 end
