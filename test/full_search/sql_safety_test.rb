@@ -51,4 +51,34 @@ class FullSearch::SqlSafetyTest < ActiveSupport::TestCase
       end
     end
   end
+
+  def test_index_if_sql_with_semicolon_raises
+    dsl = FullSearch::Dsl.new(Customer)
+    error = assert_raises(FullSearch::InvalidFieldError) do
+      dsl.index_if(sql: "status = 1; DROP TABLE customers")
+    end
+    assert_includes error.message, "Customer"
+    assert_includes error.message, "index_if"
+  end
+
+  def test_exact_match_sql_with_comment_raises
+    dsl = FullSearch::Dsl.new(Customer)
+    error = assert_raises(FullSearch::InvalidFieldError) do
+      dsl.exact_match :vin, sql: "vin /* dangerous */"
+    end
+    assert_includes error.message, "Customer"
+    assert_includes error.message, "exact_match"
+  end
+
+  def test_valid_index_if_sql_accepted
+    dsl = FullSearch::Dsl.new(Customer)
+    dsl.index_if(sql: "active = 1 AND deleted_at IS NULL")
+    assert_equal "active = 1 AND deleted_at IS NULL", dsl.index_if_sql
+  end
+
+  def test_valid_exact_match_sql_accepted
+    dsl = FullSearch::Dsl.new(Customer)
+    dsl.exact_match :vin, sql: "UPPER(REPLACE(col, '-', ''))"
+    assert_equal "UPPER(REPLACE(col, '-', ''))", dsl.exact_matches.first.sql
+  end
 end

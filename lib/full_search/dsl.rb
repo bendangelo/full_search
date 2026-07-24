@@ -45,7 +45,9 @@ module FullSearch
       end
       str = name.to_s
       raise InvalidFieldError, "#{model_class.name}: duplicate exact_match name #{name.inspect}" if exact_matches.any? { |e| e.name == str }
-      @exact_matches << ExactMatch.new(name: str, source: source, sql: sql&.to_s, normalize: normalize, version: version)
+      sql_str = sql&.to_s
+      validate_sql_fragment!(sql_str, "exact_match sql:") if sql_str
+      @exact_matches << ExactMatch.new(name: str, source: source, sql: sql_str, normalize: normalize, version: version)
     end
 
     def rank_by(column, direction = :desc)
@@ -92,7 +94,9 @@ module FullSearch
     end
 
     def index_if(sql: nil)
-      @index_if_sql = sql&.to_s
+      sql_str = sql&.to_s
+      validate_sql_fragment!(sql_str, "index_if sql:") if sql_str
+      @index_if_sql = sql_str
     end
 
     def conditional_index?
@@ -138,6 +142,12 @@ module FullSearch
     end
 
     private
+
+    def validate_sql_fragment!(sql, option_name)
+      if sql.match?(/;|--|\/\*|\*\//)
+        raise InvalidFieldError, "#{model_class.name}: #{option_name} contains unsafe characters"
+      end
+    end
 
     def valid_name?(name)
       name.to_s.match?(/\A[a-zA-Z_]\w*\z/)
