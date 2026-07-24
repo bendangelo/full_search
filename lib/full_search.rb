@@ -5,6 +5,7 @@ require "active_support"
 require "active_support/concern"
 
 require "full_search/index_cache"
+require "full_search/instrumentation"
 require "full_search/version"
 require "full_search/config"
 require "full_search/distance"

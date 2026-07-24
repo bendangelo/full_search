@@ -22,39 +22,41 @@ module FullSearch
     MIN_TERM_LENGTH = 3
 
     def relation
-      validate_filter_keys!
-      validate_required_filters!
-      check_stale_config!
+      FullSearch::Instrumentation.instrument("query", model: model.name, query: query) do
+        validate_filter_keys!
+        validate_required_filters!
+        check_stale_config!
 
-      return model.none if dsl.tokenize == "trigram" && query.length < MIN_TERM_LENGTH && !dsl.typo_tolerance?
+        return model.none if dsl.tokenize == "trigram" && query.length < MIN_TERM_LENGTH && !dsl.typo_tolerance?
 
-      parsed = QueryParser.parse(query)
-      exact_ids = ExactMatch.ids_for(model, query, filters)
-      primary_ids = fts_match_ids(parsed)
-      fallback_ids = (dsl.typo_tolerance? && matching_strategy != "all") ? trigram_match_ids(parsed, primary_ids, candidate_limit: per_strategy_limit) : []
-      fuzzy_ids = (dsl.typo_tolerance? && matching_strategy != "all" && primary_ids.empty? && fallback_ids.empty?) ? fuzzy_match_ids(parsed, candidate_limit: per_strategy_limit) : []
+        parsed = QueryParser.parse(query)
+        exact_ids = ExactMatch.ids_for(model, query, filters)
+        primary_ids = fts_match_ids(parsed)
+        fallback_ids = (dsl.typo_tolerance? && matching_strategy != "all") ? trigram_match_ids(parsed, primary_ids, candidate_limit: per_strategy_limit) : []
+        fuzzy_ids = (dsl.typo_tolerance? && matching_strategy != "all" && primary_ids.empty? && fallback_ids.empty?) ? fuzzy_match_ids(parsed, candidate_limit: per_strategy_limit) : []
 
-      all_ids = (exact_ids + primary_ids + fallback_ids + fuzzy_ids).uniq
-      return model.none if all_ids.empty?
+        all_ids = (exact_ids + primary_ids + fallback_ids + fuzzy_ids).uniq
+        return model.none if all_ids.empty?
 
-      rel = model.where(id: all_ids)
-      rel = rel.where(model.arel_table[dsl.soft_delete_column].eq(nil)) if dsl.soft_delete_column && !include_soft_deleted
-      rel = apply_ranking(rel, all_ids, exact_ids)
-      rel = scope.call(rel) if scope
-      rel = rel.limit(limit) if limit
-      rel = rel.offset(offset) if offset
-      rel = rel.includes(includes) if includes
+        rel = model.where(id: all_ids)
+        rel = rel.where(model.arel_table[dsl.soft_delete_column].eq(nil)) if dsl.soft_delete_column && !include_soft_deleted
+        rel = apply_ranking(rel, all_ids, exact_ids)
+        rel = scope.call(rel) if scope
+        rel = rel.limit(limit) if limit
+        rel = rel.offset(offset) if offset
+        rel = rel.includes(includes) if includes
 
-      if highlight
-        records = rel.to_a
-        Highlighter.apply!(records, model, query, record_ids: records.map(&:id))
-        records
-      elsif highlight_fields
-        records = rel.to_a
-        Highlighter.apply_fields!(records, model, query, record_ids: records.map(&:id))
-        records
-      else
-        rel
+        if highlight
+          records = rel.to_a
+          Highlighter.apply!(records, model, query, record_ids: records.map(&:id))
+          records
+        elsif highlight_fields
+          records = rel.to_a
+          Highlighter.apply_fields!(records, model, query, record_ids: records.map(&:id))
+          records
+        else
+          rel
+        end
       end
     end
 

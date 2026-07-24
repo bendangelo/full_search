@@ -123,8 +123,9 @@ module FullSearch
       ActiveRecord::Base.connection
     end
 
-    def self.raise_missing_table_or_original(error, _model_class)
+    def self.raise_missing_table_or_original(error, model_class)
       if error.message.include?("no such table")
+        FullSearch::Instrumentation.instrument("missing_table", model: model_class.name, error: error.message)
         return
       end
       raise error

@@ -65,21 +65,23 @@ module FullSearch
         create_metadata_table!
 
         with_rebuild_lock(model) do
-          drop_triggers!(model)
-          conn.execute("DROP TABLE IF EXISTS #{qt(fts_table_name(model))};")
-          conn.execute("DROP TABLE IF EXISTS #{qt(trigram_table_name(model))};")
-          conn.execute(create_virtual_table_sql(model))
-          if dsl.typo_tolerance?
-            FullSearch::Typo.warn_unsupported!(model) unless FullSearch::Typo.supported?(model)
-            conn.execute(create_trigram_virtual_table_sql(model))
+          FullSearch::Instrumentation.instrument("rebuild", model: model.name) do
+            drop_triggers!(model)
+            conn.execute("DROP TABLE IF EXISTS #{qt(fts_table_name(model))};")
+            conn.execute("DROP TABLE IF EXISTS #{qt(trigram_table_name(model))};")
+            conn.execute(create_virtual_table_sql(model))
+            if dsl.typo_tolerance?
+              FullSearch::Typo.warn_unsupported!(model) unless FullSearch::Typo.supported?(model)
+              conn.execute(create_trigram_virtual_table_sql(model))
+            end
+            conn.execute(backfill_sql(model))
+            conn.execute(backfill_trigram_sql(model)) if dsl.typo_tolerance?
+            reindex_source_fields!(model) if dsl.fields.any?(&:source)
+            create_triggers!(model)
+            optimize!(model)
+            store_config_hash!(model, rebuilt_at: Time.current)
+            verified_tables.add(model.table_name)
           end
-          conn.execute(backfill_sql(model))
-          conn.execute(backfill_trigram_sql(model)) if dsl.typo_tolerance?
-          reindex_source_fields!(model) if dsl.fields.any?(&:source)
-          create_triggers!(model)
-          optimize!(model)
-          store_config_hash!(model, rebuilt_at: Time.current)
-          verified_tables.add(model.table_name)
         end
       end
 
@@ -103,8 +105,10 @@ module FullSearch
       end
 
       def optimize!(model)
-        sqlite!(model)
-        connection.execute("INSERT INTO #{qt(fts_table_name(model))}(#{qt(fts_table_name(model))}) VALUES('optimize');")
+        FullSearch::Instrumentation.instrument("optimize", model: model.name) do
+          sqlite!(model)
+          connection.execute("INSERT INTO #{qt(fts_table_name(model))}(#{qt(fts_table_name(model))}) VALUES('optimize');")
+        end
       end
 
       def reindex_source_fields!(model)
