@@ -12,4 +12,8 @@ FullSearch.configure do |config|
   # Reindex computed source: fields synchronously (false) or via background job (true).
   # Bulk imports should use FullSearch.bulk_import(Model) { ... } to defer reindexing.
   config.default_async_source_reindex = true
+
+  # Uncomment to exclude full_search virtual tables from db/schema.rb.
+  # When false, you must run `bin/rails full_search:prepare` after db:schema:load.
+  # config.dump_schema_virtual_tables = false
 end

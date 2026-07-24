@@ -12,7 +12,8 @@ class FullSearch::ConfigTest < ActiveSupport::TestCase
     assert_equal :raise, FullSearch.config.stale_query_behavior
     assert_equal true, FullSearch.config.lock_rebuilds
     assert_equal true, FullSearch.config.default_async_reindex
-    assert_equal "unicode61", FullSearch.config.default_tokenizer
+    assert_equal "porter", FullSearch.config.default_tokenizer
+    assert_equal true, FullSearch.config.dump_schema_virtual_tables
   end
 
   def test_configure_block

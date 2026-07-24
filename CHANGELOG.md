@@ -83,10 +83,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `full_search:install` generator now automatically runs `full_search:prepare` after creating the initializer.
 - `--skip-prepare` flag on `full_search:install` to skip automatic FTS table creation.
 - Generator gracefully skips `full_search:prepare` with a warning if the database isn't ready yet.
+- `Config#dump_schema_virtual_tables` option (default `true`) to control whether FTS virtual tables appear in `db/schema.rb`.
 
 ### Changed
 
 - README "Installation" section now documents automatic `full_search:prepare` and the `--skip-prepare` flag.
+- Default tokenizer changed from `unicode61` to `porter` for stemmed keyword search out of the box.
+- `typo_tolerance` no longer creates a redundant `*_fts_trigram` shadow table when the primary FTS table already uses the `trigram` tokenizer.
 
 ## 0.3.4 — Conditional indexing
 

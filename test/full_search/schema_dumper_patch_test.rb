@@ -66,6 +66,65 @@ class SchemaDumperPatchTest < ActiveSupport::TestCase
       "Expected schema dumper to include virtual table definitions"
   end
 
+  def test_schema_dumper_includes_trigram_table_when_needed
+    model = Class.new(Customer) do
+      full_search({tokenize: "porter"}) do
+        field :first_name, weight: 5
+        filter :account_id, required: true
+        typo_tolerance
+      end
+    end
+    model.table_name = "customers"
+    FullSearch::Index.rebuild!(model)
+
+    stream = StringIO.new
+    ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
+    output = stream.string
+
+    assert_includes output, "create_virtual_table \"customers_fts\""
+    assert_includes output, "create_virtual_table \"customers_fts_trigram\""
+  end
+
+  def test_schema_dumper_skips_trigram_table_when_redundant
+    model = Class.new(Customer) do
+      full_search({tokenize: "trigram"}) do
+        field :first_name, weight: 5
+        filter :account_id, required: true
+        typo_tolerance
+      end
+    end
+    model.table_name = "customers"
+    FullSearch::Index.rebuild!(model)
+
+    stream = StringIO.new
+    ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
+    output = stream.string
+
+    assert_includes output, "create_virtual_table \"customers_fts\""
+    refute_includes output, "customers_fts_trigram",
+      "Should not dump trigram shadow table when primary is already trigram"
+  end
+
+  def test_dump_schema_virtual_tables_default_includes_tables
+    FullSearch::Index.ensure_table!(@model)
+    stream = StringIO.new
+    ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
+    assert stream.string.include?("create_virtual_table"),
+      "Expected virtual tables in schema dump by default"
+  end
+
+  def test_dump_schema_virtual_tables_false_excludes_tables
+    FullSearch::Index.ensure_table!(@model)
+    FullSearch.config.dump_schema_virtual_tables = false
+
+    stream = StringIO.new
+    ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
+    refute stream.string.include?("create_virtual_table"),
+      "Expected no virtual tables in schema dump when disabled"
+  ensure
+    FullSearch.config.dump_schema_virtual_tables = true
+  end
+
   def test_virtual_tables_skips_unparseable_entries
     conn = ActiveRecord::Base.connection
     conn.execute("DROP TABLE IF EXISTS schema_dumper_test_fts;")

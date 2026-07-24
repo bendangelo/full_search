@@ -11,6 +11,8 @@ module FullSearch
     private
 
     def virtual_tables(stream)
+      return unless FullSearch.config.dump_schema_virtual_tables
+
       virtual_tables = @connection.virtual_tables.reject { |name, _| ignored?(name) }
 
       if virtual_tables.any?

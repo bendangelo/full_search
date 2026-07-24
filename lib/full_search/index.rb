@@ -36,7 +36,7 @@ module FullSearch
         end
 
         trigram_was_created = false
-        if dsl.typo_tolerance? && !trigram_table_exists?(model)
+        if trigram_table_needed?(model) && !trigram_table_exists?(model)
           FullSearch::Typo.warn_unsupported!(model) unless FullSearch::Typo.supported?(model)
           conn.execute(create_trigram_virtual_table_sql(model))
           trigram_was_created = true
@@ -70,12 +70,12 @@ module FullSearch
             conn.execute("DROP TABLE IF EXISTS #{qt(fts_table_name(model))};")
             conn.execute("DROP TABLE IF EXISTS #{qt(trigram_table_name(model))};")
             conn.execute(create_virtual_table_sql(model))
-            if dsl.typo_tolerance?
+            if trigram_table_needed?(model)
               FullSearch::Typo.warn_unsupported!(model) unless FullSearch::Typo.supported?(model)
               conn.execute(create_trigram_virtual_table_sql(model))
             end
             conn.execute(backfill_sql(model))
-            conn.execute(backfill_trigram_sql(model)) if dsl.typo_tolerance?
+            conn.execute(backfill_trigram_sql(model)) if trigram_table_needed?(model)
             reindex_source_fields!(model) if dsl.fields.any?(&:source)
             create_triggers!(model)
             optimize!(model)
@@ -141,7 +141,7 @@ module FullSearch
         if model.full_search_dsl.soft_delete_column
           connection.execute(soft_delete_removal_trigger_sql(model))
         end
-        if model.full_search_dsl.typo_tolerance?
+        if trigram_table_needed?(model)
           connection.execute(insert_trigram_trigger_sql(model))
           connection.execute(delete_trigram_trigger_sql(model))
           connection.execute(update_trigram_trigger_sql(model))
@@ -197,6 +197,16 @@ module FullSearch
 
       def missing_table?(model)
         !table_exists?(model)
+      end
+
+      def trigram_table_needed?(model)
+        model.full_search_dsl&.typo_tolerance? && model.full_search_dsl.tokenize != "trigram"
+      end
+
+      def trigram_table_exists?(model)
+        connection.execute(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name=#{q(trigram_table_name(model))} LIMIT 1"
+        ).any?
       end
 
       private
@@ -292,7 +302,7 @@ module FullSearch
         ).map { |r| r["name"] }
 
         expected = trigger_names(model)
-        expected += trigram_trigger_names(model) if model.full_search_dsl.typo_tolerance?
+        expected += trigram_trigger_names(model) if trigram_table_needed?(model)
         return if (expected - existing).empty? && (existing - expected).empty?
 
         rebuild!(model)
@@ -389,12 +399,6 @@ module FullSearch
             DELETE FROM #{fts_table} WHERE rowid = old.id;
           END;
         SQL
-      end
-
-      def trigram_table_exists?(model)
-        connection.execute(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name=#{q(trigram_table_name(model))} LIMIT 1"
-        ).any?
       end
 
       def create_trigram_virtual_table_sql(model)

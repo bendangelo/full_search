@@ -146,6 +146,8 @@ module FullSearch
         return like_prefix_ids(term, candidate_limit: candidate_limit)
       end
 
+      return [] unless FullSearch::Index.trigram_table_exists?(model)
+
       trigram_table = qt(FullSearch::Index.trigram_table_name(model))
       tbl = qt(model.table_name)
 

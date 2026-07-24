@@ -134,6 +134,46 @@ class FullSearch::TypoTest < ActiveSupport::TestCase
     assert_equal 0, results.size
   end
 
+  def test_trigram_table_not_created_when_primary_is_trigram
+    model = Class.new(Customer) do
+      full_search({tokenize: "trigram"}) do
+        field :first_name, weight: 5
+        filter :account_id, required: true
+        typo_tolerance
+      end
+    end
+    model.table_name = "customers"
+    FullSearch::Index.rebuild!(model)
+
+    fts_exists = ActiveRecord::Base.connection.execute(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='customers_fts'"
+    ).any?
+    trigram_exists = ActiveRecord::Base.connection.execute(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='customers_fts_trigram'"
+    ).any?
+
+    assert fts_exists, "Primary FTS table should exist"
+    refute trigram_exists, "Trigram shadow table should not exist when primary is already trigram"
+  end
+
+  def test_trigram_table_created_when_primary_is_not_trigram
+    model = Class.new(Customer) do
+      full_search({tokenize: "porter"}) do
+        field :first_name, weight: 5
+        filter :account_id, required: true
+        typo_tolerance
+      end
+    end
+    model.table_name = "customers"
+    FullSearch::Index.rebuild!(model)
+
+    trigram_exists = ActiveRecord::Base.connection.execute(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='customers_fts_trigram'"
+    ).any?
+
+    assert trigram_exists, "Trigram shadow table should exist when primary is porter"
+  end
+
   def test_no_typo_with_matching_strategy_all
     model = Class.new(Customer) do
       full_search do

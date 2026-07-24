@@ -223,6 +223,18 @@ The rebuild task checks each model's stored config hash against the current DSL 
 bin/rails full_search:reset
 ```
 
+### Schema dump
+
+By default, `full_search` includes its FTS virtual tables in `db/schema.rb` so that `db:schema:load` produces a complete, loadable database. To exclude them:
+
+```ruby
+FullSearch.configure do |config|
+  config.dump_schema_virtual_tables = false
+end
+```
+
+When disabled, you must run `bin/rails full_search:prepare` after every `db:schema:load` to recreate the indexes.
+
 ### Rake tasks
 
 | Task | Description |

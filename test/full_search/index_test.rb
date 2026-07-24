@@ -289,7 +289,7 @@ class FullSearch::IndexTest < ActiveSupport::TestCase
         field :first_name, weight: 5, as: :fname
         field :last_name, weight: 5
         filter :account_id, required: true
-        tokenize "trigram"
+        tokenize "porter"
         typo_tolerance
       end
     end
@@ -315,5 +315,45 @@ class FullSearch::IndexTest < ActiveSupport::TestCase
       Customer.delete_all
       Account.delete_all
     end
+  end
+
+  def test_ensure_table_does_not_create_trigram_when_redundant
+    model = Class.new(Customer) do
+      full_search({tokenize: "trigram"}) do
+        field :first_name, weight: 5
+        filter :account_id, required: true
+        typo_tolerance
+      end
+    end
+    model.table_name = "customers"
+    FullSearch::Index.ensure_table!(model)
+
+    trigram_exists = ActiveRecord::Base.connection.execute(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='customers_fts_trigram'"
+    ).any?
+    refute trigram_exists, "Should not create trigram table when primary tokenizer is trigram"
+
+    FullSearch::Index.drop!(model)
+    Customer.delete_all
+  end
+
+  def test_ensure_table_creates_trigram_when_porter
+    model = Class.new(Customer) do
+      full_search({tokenize: "porter"}) do
+        field :first_name, weight: 5
+        filter :account_id, required: true
+        typo_tolerance
+      end
+    end
+    model.table_name = "customers"
+    FullSearch::Index.ensure_table!(model)
+
+    trigram_exists = ActiveRecord::Base.connection.execute(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='customers_fts_trigram'"
+    ).any?
+    assert trigram_exists, "Should create trigram table when primary tokenizer is porter"
+
+    FullSearch::Index.drop!(model)
+    Customer.delete_all
   end
 end
