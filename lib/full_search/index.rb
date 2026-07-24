@@ -111,11 +111,23 @@ module FullSearch
         dsl = model.full_search_dsl
         return unless dsl
 
-        model.find_each do |record|
-          dsl.fields.each do |field|
-            FullSearch::Callbacks.reindex_field!(record, field.name) if field.source
-          end
+        source_fields = dsl.fields.select(&:source)
+        return if source_fields.empty?
+
+        model.find_each(batch_size: 500) do |record|
+          pairs = source_fields.to_h { |f| [column_name(f), FullSearch::Model.evaluate_source(record, f).to_s] }
+          next if pairs.empty?
+          upsert_source_row!(model, record.id, pairs)
         end
+      end
+
+      def upsert_source_row!(model, rowid, values)
+        table = qt(fts_table_name(model))
+        sets = values.map { |name, value| "#{qc(name)} = #{q(value)}" }.join(", ")
+
+        connection.execute(<<~SQL)
+          UPDATE #{table} SET #{sets} WHERE rowid = #{q(rowid)};
+        SQL
       end
 
       def create_triggers!(model)

@@ -60,7 +60,11 @@ class FullSearch::CallbacksTest < ActiveSupport::TestCase
       FullSearch::Callbacks.reindex_field!(customer, "computed")
     end
   ensure
-    FullSearch::Index.drop!(model) rescue nil
+    begin
+      FullSearch::Index.drop!(model)
+    rescue
+      nil
+    end
     Object.send(:remove_const, :MissingTableReindexCustomer) if Object.const_defined?(:MissingTableReindexCustomer)
   end
 
@@ -88,7 +92,11 @@ class FullSearch::CallbacksTest < ActiveSupport::TestCase
       FullSearch::Callbacks.remove_record!(customer)
     end
   ensure
-    FullSearch::Index.drop!(model) rescue nil
+    begin
+      FullSearch::Index.drop!(model)
+    rescue
+      nil
+    end
     Object.send(:remove_const, :MissingTableRemoveCustomer) if Object.const_defined?(:MissingTableRemoveCustomer)
   end
 

@@ -50,6 +50,36 @@ class FullSearch::IndexTest < ActiveSupport::TestCase
     assert_equal "HONDA", row["make_search"]
   end
 
+  def test_rebuild_populates_multiple_source_fields
+    account = Account.create!(name: "Acme")
+    vehicle = Vehicle.create!(account_id: account.id, make: "Honda", model: "Civic")
+
+    search_model = Class.new(Vehicle) do
+      full_search do
+        field :make_search, weight: 5, source: -> { make&.upcase }
+        field :model_search, weight: 3, source: -> { model&.downcase }
+        filter :account_id, required: true
+      end
+    end
+    search_model.table_name = "vehicles"
+
+    begin
+      FullSearch::Index.rebuild!(search_model)
+
+      fts_table = FullSearch::Index.fts_table_name(search_model)
+      row = ActiveRecord::Base.connection.execute(
+        "SELECT make_search, model_search FROM #{fts_table} WHERE rowid = #{vehicle.id}"
+      ).first
+
+      assert_equal "HONDA", row["make_search"]
+      assert_equal "civic", row["model_search"]
+    ensure
+      FullSearch::Index.drop!(search_model)
+      Customer.delete_all
+      Account.delete_all
+    end
+  end
+
   def test_rebuild_populates_rows
     account = Account.create!(name: "Acme")
     @model.create!(account_id: account.id, first_name: "Sam", last_name: "Smith")
