@@ -84,16 +84,17 @@ module FullSearch
 
     def self.reindex_dependents!(parent_record, dependent_model, field)
       fk = association_key(dependent_model, field.reindex_on)
-      conn = ActiveRecord::Base.connection
+      conn = connection_for(dependent_model)
       sql = "SELECT id FROM #{qt(dependent_model.table_name)} WHERE #{qc(fk)} = #{q(parent_record.id)}"
       dependent_ids = conn.execute(sql).map { |r| r["id"] }
 
-      dependent_ids.each do |dep_id|
-        if field.async
-          FullSearch::ReindexJob.perform_later(dependent_model.name, dep_id, field.name)
-        else
-          dependent = dependent_model.find_by(id: dep_id)
-          reindex_field!(dependent, field.name) if dependent
+      return if dependent_ids.empty?
+
+      if field.async
+        dependent_ids.each { |id| FullSearch::ReindexJob.perform_later(dependent_model.name, id, field.name) }
+      else
+        dependent_model.where(id: dependent_ids).find_each(batch_size: 500) do |record|
+          reindex_field!(record, field.name)
         end
       end
     end
