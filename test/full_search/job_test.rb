@@ -92,6 +92,32 @@ class FullSearch::JobTest < ActiveSupport::TestCase
     assert_equal "low", FullSearch::BackfillJob.queue_name
   end
 
+  def test_backfill_job_raises_on_non_sqlite_adapter
+    model = Object.new
+    def model.name
+      "FakeNonSqlite"
+    end
+
+    def model.connection
+      Object.new.tap { |o|
+        def o.adapter_name
+          "PostgreSQL"
+        end
+      }
+    end
+
+    def model.table_name
+      "fakes"
+    end
+    Object.const_set(:FakeNonSqlite, model)
+
+    assert_raises(FullSearch::UnsupportedDatabaseError) do
+      FullSearch::BackfillJob.perform_now("FakeNonSqlite")
+    end
+  ensure
+    Object.send(:remove_const, :FakeNonSqlite) if Object.const_defined?(:FakeNonSqlite)
+  end
+
   def test_backfill_job_rebuilds_index
     ActiveJob::Base.queue_adapter = :inline
     account = Account.create!(name: "Acme")

@@ -12,7 +12,7 @@ def resolve_full_search_models(args)
       klass || FullSearch.models.find { |m| m.table_name == name }
     end.compact
   else
-    FullSearch.models
+    FullSearch.sorted_models
   end
 end
 

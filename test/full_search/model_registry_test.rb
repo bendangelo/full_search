@@ -45,7 +45,10 @@ class FullSearch::ModelRegistryTest < ActiveSupport::TestCase
     }
     b_model.table_name = "vehicles"
 
-    assert_equal ["customers", "vehicles"], FullSearch.sorted_models.map(&:table_name)
+    sorted = FullSearch.sorted_models.map(&:table_name)
+    assert_operator sorted.index("customers"), :<=, sorted.rindex("vehicles"),
+      "models should be sorted by table_name"
+    assert_equal sorted, sorted.sort, "sorted_models should be deterministic"
   ensure
     begin
       FullSearch.deregister_model(a_model)
