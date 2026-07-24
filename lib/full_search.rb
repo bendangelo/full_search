@@ -4,6 +4,7 @@ require "active_record"
 require "active_support"
 require "active_support/concern"
 
+require "full_search/constants"
 require "full_search/index_cache"
 require "full_search/instrumentation"
 require "full_search/version"

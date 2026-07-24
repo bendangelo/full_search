@@ -19,7 +19,7 @@ module FullSearch
       @includes = includes
     end
 
-    MIN_TERM_LENGTH = 3
+    MIN_TERM_LENGTH = FullSearch::Constants::MIN_TERM_LENGTH
 
     def relation
       FullSearch::Instrumentation.instrument("query", model: model.name, query: query) do
@@ -281,7 +281,7 @@ module FullSearch
     def max_allowed_typos(length)
       min_length = dsl.typo_tolerance_min_term_length.to_i
       return -1 if length < min_length
-      return 2 if length >= 9
+      return 2 if length >= FullSearch::Constants::TWO_TYPO_MIN_LENGTH
       1
     end
 

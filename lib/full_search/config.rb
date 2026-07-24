@@ -12,9 +12,9 @@ module FullSearch
       @lock_rebuilds = true
       @default_async_reindex = true
       @default_async_source_reindex = true
-      @default_tokenizer = "unicode61"
+      @default_tokenizer = FullSearch::Constants::DEFAULT_TOKENIZER
       @auto_rebuild_on_stale_query = false
-      @min_like_prefix_length = 3
+      @min_like_prefix_length = FullSearch::Constants::DEFAULT_MIN_LIKE_PREFIX_LENGTH
     end
   end
 

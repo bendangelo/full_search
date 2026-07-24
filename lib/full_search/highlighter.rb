@@ -59,7 +59,7 @@ module FullSearch
         length = query.length
         min_length = dsl.typo_tolerance_min_term_length.to_i
         return nil if length < min_length
-        return 2 if length >= 9
+        return 2 if length >= FullSearch::Constants::TWO_TYPO_MIN_LENGTH
         1
       end
 
@@ -170,8 +170,8 @@ module FullSearch
       end
 
       def max_allowed_typos(length)
-        return -1 if length < 3
-        return 2 if length >= 9
+        return -1 if length < FullSearch::Constants::MIN_TERM_LENGTH
+        return 2 if length >= FullSearch::Constants::TWO_TYPO_MIN_LENGTH
         1
       end
 

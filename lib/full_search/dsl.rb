@@ -113,7 +113,7 @@ module FullSearch
 
     def typo_tolerance(enabled = true, min_term_length: nil)
       @typo_tolerance = enabled
-      @typo_tolerance_min_term_length = min_term_length || 3
+      @typo_tolerance_min_term_length = min_term_length || FullSearch::Constants::MIN_TERM_LENGTH
     end
 
     def typo_tolerance?
@@ -121,7 +121,7 @@ module FullSearch
     end
 
     def typo_tolerance_min_term_length
-      @typo_tolerance_min_term_length || 3
+      @typo_tolerance_min_term_length || FullSearch::Constants::MIN_TERM_LENGTH
     end
 
     def config_hash

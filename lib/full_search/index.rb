@@ -520,7 +520,7 @@ module FullSearch
         connection.transaction do
           if FullSearch.config.lock_rebuilds
             connection.execute(
-              "INSERT INTO full_search_index_versions (table_name, config_hash, rebuilt_at) VALUES (#{q(model.table_name)}, #{q("__rebuilding__")}, datetime('now'))
+              "INSERT INTO full_search_index_versions (table_name, config_hash, rebuilt_at) VALUES (#{q(model.table_name)}, #{q(FullSearch::Constants::REBUILDING_HASH)}, datetime('now'))
                ON CONFLICT(table_name) DO UPDATE SET config_hash=excluded.config_hash;"
             )
           end
