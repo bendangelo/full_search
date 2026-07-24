@@ -193,6 +193,20 @@ end
 
 ### In production
 
+**`auto_rebuild_schema`** — Must be `false` in production. The generated initializer defaults to `Rails.env.local?`, so it's already off. If enabled, every process (web, worker, console) attempts schema rebuilds on boot, which is unnecessary and can cause issues during zero-downtime deploys where old and new processes overlap.
+
+**`auto_rebuild_on_stale_query`** — Must be `false` in production. A query-time rebuild is dangerous — it can cause timeouts or race conditions under load. The generated initializer defaults to `Rails.env.local?`, keeping it off in production.
+
+**`lock_rebuilds`** — This option uses a Ruby `Mutex` and only prevents concurrent rebuilds within the same process. It does **not** coordinate across processes or hosts. Multi-process or multi-host deployments must run `full_search:rebuild` from a single deployment step.
+
+**Docker entrypoint** — For containerized environments, add `full_search:prepare` after `db:prepare:with_data`:
+
+```bash
+./bin/rails full_search:prepare
+```
+
+`full_search:prepare` is idempotent — it only creates missing FTS tables and installs triggers, making it safe to run on every deploy.
+
 Auto-rebuild runs on every Rails process boot (web, worker, console). For zero-downtime deploys where old processes still serve traffic, or if you prefer explicit control, set `auto_rebuild_schema` to `false` and run the rebuild task manually:
 
 ```bash
