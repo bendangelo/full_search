@@ -31,7 +31,7 @@ namespace :full_search do
         klass
       end.compact
     else
-      FullSearch.models
+      FullSearch.sorted_models
     end
 
     FullSearch.setup!
@@ -77,7 +77,7 @@ namespace :full_search do
   task optimize: :environment do
     Rails.application.eager_load!
     FullSearch.optimize!
-    FullSearch.models.each do |model|
+    FullSearch.sorted_models.each do |model|
       puts "Optimized #{FullSearch::Index.fts_table_name(model)}"
     end
   end
@@ -85,7 +85,7 @@ namespace :full_search do
   desc "Show full_search index status"
   task status: :environment do
     Rails.application.eager_load!
-    FullSearch.models.each do |model|
+    FullSearch.sorted_models.each do |model|
       stored = FullSearch::Index.stored_config_hash(model)
       current = model.full_search_dsl.config_hash
       status = (stored == current) ? "ok" : "stale"

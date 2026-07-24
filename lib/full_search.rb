@@ -41,6 +41,10 @@ module FullSearch
       @models ||= Set.new
     end
 
+    def sorted_models
+      models.sort_by { |m| m.table_name.to_s }
+    end
+
     def register_model(model)
       models << model
     end
@@ -50,11 +54,11 @@ module FullSearch
     end
 
     def optimize!
-      models.each { |model| Index.optimize!(model) }
+      sorted_models.each { |model| Index.optimize!(model) }
     end
 
     def setup!
-      models.each do |model|
+      sorted_models.each do |model|
         Index.ensure_table!(model)
         Callbacks.install!(model)
       end

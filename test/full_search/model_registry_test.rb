@@ -29,6 +29,36 @@ class FullSearch::ModelRegistryTest < ActiveSupport::TestCase
     refute_includes FullSearch.models, klass
   end
 
+  def test_sorted_models_returns_deterministic_order
+    a_model = Class.new(Customer) {
+      def self.name
+        "AaaModel"
+      end
+      full_search { field :first_name }
+    }
+    a_model.table_name = "customers"
+    b_model = Class.new(Vehicle) {
+      def self.name
+        "BbbModel"
+      end
+      full_search { field :make }
+    }
+    b_model.table_name = "vehicles"
+
+    assert_equal ["customers", "vehicles"], FullSearch.sorted_models.map(&:table_name)
+  ensure
+    begin
+      FullSearch.deregister_model(a_model)
+    rescue
+      nil
+    end
+    begin
+      FullSearch.deregister_model(b_model)
+    rescue
+      nil
+    end
+  end
+
   def test_registering_same_class_twice_is_idempotent
     klass = Class.new(Customer) do
       full_search do
