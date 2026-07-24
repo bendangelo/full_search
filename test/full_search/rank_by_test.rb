@@ -28,6 +28,35 @@ class FullSearch::RankByTest < ActiveSupport::TestCase
     assert_equal [new_record, old_record], results
   end
 
+  def test_ranking_boost_caps_exact_match_ids
+    account = Account.create!(name: "Acme")
+    150.times do |i|
+      Customer.create!(account_id: account.id, first_name: "Person#{i}")
+    end
+
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name, weight: 5
+        filter :account_id, required: true
+      end
+    end
+    model.table_name = "customers"
+
+    begin
+      FullSearch::Index.rebuild!(model)
+      results = model.full_search("Person", filters: {account_id: account.id}).to_a
+      assert_equal 150, results.length
+    ensure
+      begin
+        FullSearch::Index.drop!(model)
+      rescue
+        nil
+      end
+      Customer.delete_all
+      Account.delete_all
+    end
+  end
+
   def test_boosts_exact_match_to_top
     @model = Class.new(Customer) do
       full_search do

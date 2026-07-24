@@ -307,7 +307,8 @@ module FullSearch
       tbl = qt(model.table_name)
 
       if exact_ids.any?
-        order_parts << "CASE #{tbl}.id #{exact_ids.map { |id| "WHEN #{q(id)} THEN 0" }.join(" ")} ELSE 1 END"
+        boost_ids = exact_ids.first(FullSearch::Constants::MAX_EXACT_MATCH_BOOST_IDS)
+        order_parts << "CASE #{tbl}.id #{boost_ids.map { |id| "WHEN #{q(id)} THEN 0" }.join(" ")} ELSE 1 END"
       end
 
       fts_table = qt(FullSearch::Index.fts_table_name(model))
