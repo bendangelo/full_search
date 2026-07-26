@@ -84,12 +84,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--skip-prepare` flag on `full_search:install` to skip automatic FTS table creation.
 - Generator gracefully skips `full_search:prepare` with a warning if the database isn't ready yet.
 - `Config#dump_schema_virtual_tables` option (default `true`) to control whether FTS virtual tables appear in `db/schema.rb`.
+- Expanded `FullSearch::TestHelpers` with framework-agnostic helpers for Minitest and RSpec:
+  - `setup_for_tests!` — applies safe test defaults (inline jobs, disabled rebuild locks, query-time auto-rebuild).
+  - `reindex_full_search(model)` — refreshes computed `source:` fields without rebuilding table structure.
+  - `reset_full_search!(*models)` — rebuilds all or selected registered models.
+  - `with_full_search_rebuild(model) { ... }` — wraps a block in a rebuild and cleanup.
+  - `with_full_search_async_jobs_inline { ... }` — forces inline Active Job execution inside the block.
+  - `configure { |config| ... }` — escape hatch for helper defaults.
+- `full_search:health_check` Rake task — exits non-zero when any model is missing its FTS table or has a stale config hash.
+- `FullSearch::TestHelpers#with_full_search_models_registered { ... }` — snapshots and restores the model registry around a test block, preventing anonymous searchable classes from leaking.
+- Unit test for the `full_search:install` generator using `Rails::Generators::TestCase`.
 
 ### Changed
 
 - README "Installation" section now documents automatic `full_search:prepare` and the `--skip-prepare` flag.
 - Default tokenizer changed from `unicode61` to `porter` for stemmed keyword search out of the box.
 - `typo_tolerance` no longer creates a redundant `*_fts_trigram` shadow table when the primary FTS table already uses the `trigram` tokenizer.
+- README now includes a dedicated "Testing" section with Minitest and RSpec setup examples, plus a "Production readiness" runbook covering deploy steps, configuration, monitoring, and troubleshooting.
+
+### Fixed
+
+- `IndexTest` and `EncryptedSourceFieldTest` now clean shared `Customer` / `Vehicle` / `Account` tables in setup, removing order-dependent test failures under certain seeds.
+- Bare `rescue` clauses in `Index#sqlite?`, `Search#check_stale_config!`, and the install generator narrowed to specific exception classes (`ActiveRecord::ConnectionNotEstablished`, `NoMethodError`, `ActiveRecord::StatementInvalid`, `RuntimeError`).
 
 ## 0.3.4 — Conditional indexing
 
