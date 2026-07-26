@@ -5,6 +5,8 @@ require "test_helper"
 class FullSearch::EncryptedSourceFieldTest < ActiveSupport::TestCase
   def setup
     clean_fts_tables!
+    Vehicle.delete_all
+    Account.delete_all
     @account = Account.create!(name: "Acme")
 
     @model = Class.new(Vehicle) do

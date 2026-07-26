@@ -108,4 +108,30 @@ namespace :full_search do
       puts "#{model.table_name}: #{status}#{drift_info}"
     end
   end
+
+  desc "Verify full_search indexes are present and up to date (exit 1 if unhealthy)"
+  task health_check: :environment do
+    Rails.application.eager_load!
+    unhealthy = []
+
+    FullSearch.sorted_models.each do |model|
+      if FullSearch::Index.missing_table?(model)
+        unhealthy << "#{model.table_name}: missing FTS table"
+        next
+      end
+
+      stored = FullSearch::Index.stored_config_hash(model)
+      current = model.full_search_dsl.config_hash
+      if stored != current
+        unhealthy << "#{model.table_name}: stale config hash"
+      end
+    end
+
+    if unhealthy.any?
+      unhealthy.each { |message| puts "[FAIL] #{message}" }
+      exit 1
+    else
+      puts "[OK] All full_search indexes are healthy"
+    end
+  end
 end

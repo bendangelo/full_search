@@ -4,6 +4,9 @@ require "test_helper"
 
 class FullSearch::IndexTest < ActiveSupport::TestCase
   def setup
+    Customer.delete_all
+    Account.delete_all
+
     @model = Class.new(Customer) do
       full_search do
         field :first_name, weight: 5

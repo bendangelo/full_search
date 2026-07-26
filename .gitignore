@@ -4,3 +4,5 @@
 /coverage
 /.ruby-version
 /.ruby-lsp
+/test/tmp
+/config
