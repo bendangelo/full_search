@@ -245,6 +245,7 @@ When disabled, you must run `bin/rails full_search:prepare` after every `db:sche
 | `full_search:optimize` | Run FTS5 [`optimize`](https://www.sqlite.org/fts5.html#the_optimize_command) to merge b-tree segments. Useful after bulk updates. |
 | `full_search:backfill` | Force-rebuild FTS indexes for specified models (or all). Useful for recovery after bulk operations. |
 | `full_search:status` | Show each model's index status (`ok` / `stale`) and count of empty sourced fields. |
+| `full_search:health_check` | Verify all indexes are present and current; exits `1` if any table is missing or stale. Useful for deploy gates or Docker healthchecks. |
 
 ## Background jobs
 
@@ -386,6 +387,202 @@ FullSearch.multi_search(
   ]
 )
 ```
+
+## Testing
+
+`full_search` ships with `FullSearch::TestHelpers`, a framework-agnostic module you can include in Minitest or RSpec. It provides helpers to rebuild, reindex, and reset FTS tables from your tests.
+
+### Setup
+
+Call `setup_for_tests!` once in your test boot file. It applies safe defaults:
+
+- Disables rebuild locking (`lock_rebuilds = false`)
+- Enables query-time auto-rebuild for stale indexes (`auto_rebuild_on_stale_query = true`)
+- Keeps stale-query behaviour as `raise` so real config drift fails fast
+- Forces Active Job to run inline so background reindex jobs execute synchronously
+
+#### Minitest (`test/test_helper.rb`)
+
+```ruby
+require "minitest/autorun"
+require "full_search"
+require "full_search/test_helpers"
+
+class ActiveSupport::TestCase
+  include FullSearch::TestHelpers
+end
+
+FullSearch::TestHelpers.setup_for_tests!
+```
+
+#### RSpec (`spec/rails_helper.rb`)
+
+```ruby
+require "full_search"
+require "full_search/test_helpers"
+
+RSpec.configure do |config|
+  config.include FullSearch::TestHelpers, type: :model
+end
+
+FullSearch::TestHelpers.setup_for_tests!
+```
+
+### Why you must rebuild after creating data
+
+FTS tables are updated by database triggers on normal inserts/updates, but computed `source:` fields are evaluated by Ruby during a rebuild/reindex. The safest pattern is to create your records, then call `rebuild_full_search_index(model)` before searching.
+
+### Available helpers
+
+```ruby
+# Rebuild a single model's FTS table from scratch (drops and recreates it).
+# Accepts a model class, symbol, or string class name.
+rebuild_full_search_index(Customer)
+rebuild_full_search_index(:customer)
+rebuild_full_search_index("Customer")
+
+# Re-evaluate computed source: fields only. Leaves table structure untouched.
+reindex_full_search(Customer)
+
+# Rebuild every registered search model, or only the ones passed in.
+reset_full_search!
+reset_full_search!(Customer, Vehicle)
+
+# Idempotently create any missing FTS tables/triggers for registered models.
+ensure_full_search_tables
+
+# Run a block with inline Active Job, restoring the adapter afterwards.
+with_full_search_async_jobs_inline do
+  # ReindexJob / BackfillJob execute synchronously here
+end
+
+# Run a block inside a rebuild, dropping the table at the end.
+with_full_search_rebuild(Customer) do
+  # search and assert here
+end
+
+# Scope anonymous searchable models to a block so they don't leak into
+# the global registry and affect later tests or Rake tasks.
+with_full_search_models_registered do
+  model = Class.new(Customer) do
+    full_search { field :first_name, weight: 5 }
+  end
+  model.table_name = "customers"
+  rebuild_full_search_index(model)
+  # ... search and assert
+end
+```
+
+### Minitest example
+
+```ruby
+class CustomerSearchTest < ActiveSupport::TestCase
+  def setup
+    @account = Account.create!(name: "Acme")
+    @customer = Customer.create!(account: @account, first_name: "Sam")
+    rebuild_full_search_index(Customer)
+  end
+
+  def test_finds_by_first_name
+    results = Customer.search("Sam", filters: {account_id: @account.id})
+    assert_includes results.to_a, @customer
+  end
+end
+```
+
+### RSpec example
+
+```ruby
+RSpec.describe Customer, type: :model do
+  let(:account) { create(:account) }
+  let(:customer) { create(:customer, account: account, first_name: "Sam") }
+
+  before { rebuild_full_search_index(Customer) }
+
+  it "finds by first name" do
+    results = Customer.search("Sam", filters: {account_id: account.id})
+    expect(results).to include(customer)
+  end
+end
+```
+
+### Advanced configuration
+
+If you need to override the defaults set by `setup_for_tests!`, use `FullSearch::TestHelpers.configure`:
+
+```ruby
+FullSearch::TestHelpers.configure do |config|
+  config.lock_rebuilds = true
+  config.auto_rebuild_on_stale_query = false
+  config.stale_query_behavior = :log_and_fallback
+end
+```
+
+## Production readiness
+
+`full_search` is designed for small to medium SQLite-backed Rails apps. Before running in production, review this checklist.
+
+### Initial deploy
+
+1. Run your normal database setup so application tables exist:
+   ```bash
+   bin/rails db:prepare:with_data
+   ```
+2. Create the FTS virtual tables and triggers:
+   ```bash
+   bin/rails full_search:prepare
+   ```
+3. For containerized deploys, add step 2 to your entrypoint after `db:prepare:with_data`.
+
+### Configuration
+
+The generated initializer defaults to production-safe values. Do **not** change these in production:
+
+- `auto_rebuild_schema` must be `false`. If enabled, every web/worker/console process tries to rebuild indexes on boot.
+- `auto_rebuild_on_stale_query` must be `false`. A query-time rebuild under load can cause timeouts and race conditions.
+
+If you need to change the search DSL, ship the change and then run:
+
+```bash
+bin/rails full_search:rebuild
+```
+
+from a single deployment step. The gem checks each model's stored config hash and only rebuilds indexes whose DSL has changed.
+
+### Monitoring and maintenance
+
+- **Health check** — use the built-in Rake task for deploy gates or container healthchecks:
+  ```bash
+  bin/rails full_search:health_check
+  ```
+  It exits `0` when every registered model has a current FTS table, or `1` if any table is missing or stale.
+
+- **Status overview** — `bin/rails full_search:status` prints `ok` / `stale` and the count of empty sourced fields per model.
+
+- **Scheduled optimize** — queue `FullSearch::OptimizeJob` once a day during a low-traffic window to merge FTS5 b-tree segments:
+  ```yaml
+  # config/recurring.yml
+  full_search_optimize:
+    class: FullSearch::OptimizeJob
+    schedule: daily at 4am
+    description: "Merge FTS5 b-tree segments for full_search indexes"
+  ```
+
+- **Recovery after bulk operations** — if a bulk operation bypassed triggers, rebuild the affected index:
+  ```bash
+  bin/rails 'full_search:backfill[customers]'
+  ```
+
+### Common errors
+
+| Error | Meaning | Fix |
+|-------|---------|-----|
+| `FullSearch::MissingTableError` | The FTS table does not exist yet. | Run `bin/rails full_search:prepare`. |
+| `FullSearch::ConfigChangedError` | The DSL has changed and the index is stale. | Run `bin/rails full_search:rebuild`. |
+
+### Locking note
+
+`lock_rebuilds` uses a Ruby `Mutex` and only prevents concurrent rebuilds within the same process/connection. It does not coordinate across processes or hosts. Always run `full_search:rebuild` from a single deployment step.
 
 ## Known limitations
 
