@@ -19,7 +19,7 @@ module FullSearch
 
         say "Running full_search:prepare to create FTS tables..."
         rake("full_search:prepare")
-      rescue => e
+      rescue RuntimeError => e
         say "Skipping full_search:prepare — #{e.message}", :yellow
         say "Run `bin/rails full_search:prepare` after your database is ready.", :yellow
       end

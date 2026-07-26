@@ -177,7 +177,7 @@ module FullSearch
         else
           connection.adapter_name.downcase.include?("sqlite")
         end
-      rescue
+      rescue ActiveRecord::ConnectionNotEstablished, NoMethodError
         connection.adapter_name.downcase.include?("sqlite")
       end
 

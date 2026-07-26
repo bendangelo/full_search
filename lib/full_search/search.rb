@@ -89,7 +89,7 @@ module FullSearch
 
       stored = begin
         FullSearch::Index.stored_config_hash(model)
-      rescue
+      rescue ActiveRecord::StatementInvalid
         nil
       end
       return unless stored
