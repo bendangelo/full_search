@@ -76,7 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Committed `.ruby-lsp/` directory.
 - Committed `Gemfile.lock` from version control.
 
-## Unreleased
+## 0.4.0 — 2026-07-26
 
 ### Added
 
@@ -94,6 +94,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `full_search:health_check` Rake task — exits non-zero when any model is missing its FTS table or has a stale config hash.
 - `FullSearch::TestHelpers#with_full_search_models_registered { ... }` — snapshots and restores the model registry around a test block, preventing anonymous searchable classes from leaking.
 - Unit test for the `full_search:install` generator using `Rails::Generators::TestCase`.
+- `.gitignore` rules for `*.gem`, `*.lock`, and `*.sqlite3` files to keep releases clean.
+- Test coverage for the `full_search:health_check` Rake task.
 
 ### Changed
 
@@ -106,6 +108,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `IndexTest` and `EncryptedSourceFieldTest` now clean shared `Customer` / `Vehicle` / `Account` tables in setup, removing order-dependent test failures under certain seeds.
 - Bare `rescue` clauses in `Index#sqlite?`, `Search#check_stale_config!`, and the install generator narrowed to specific exception classes (`ActiveRecord::ConnectionNotEstablished`, `NoMethodError`, `ActiveRecord::StatementInvalid`, `RuntimeError`).
+
+## Unreleased
 
 ## 0.3.4 — Conditional indexing
 
