@@ -333,4 +333,21 @@ class FullSearch::SearchTest < ActiveSupport::TestCase
   ensure
     FullSearch::Index.rebuild!(@customer_model)
   end
+
+  def test_rebuilds_missing_table_when_auto_rebuild_missing_tables_is_enabled
+    original = FullSearch.config.auto_rebuild_missing_tables
+    FullSearch.config.auto_rebuild_missing_tables = true
+
+    FullSearch::Index.drop!(@customer_model)
+    assert FullSearch::Index.missing_table?(@customer_model)
+
+    account = Account.create!(name: "Acme")
+    record = @customer_model.create!(account_id: account.id, first_name: "Sammy")
+
+    result = @customer_model.full_search("Sam", filters: {account_id: account.id})
+    assert_includes result.to_a, record
+  ensure
+    FullSearch.config.auto_rebuild_missing_tables = original
+    FullSearch::Index.rebuild!(@customer_model)
+  end
 end

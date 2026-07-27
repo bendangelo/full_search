@@ -77,6 +77,7 @@ class FullSearch::TestHelpersTest < ActiveSupport::TestCase
     original_lock_rebuilds = FullSearch.config.lock_rebuilds
     original_auto_rebuild = FullSearch.config.auto_rebuild_on_stale_query
     original_stale_behavior = FullSearch.config.stale_query_behavior
+    original_auto_rebuild_missing = FullSearch.config.auto_rebuild_missing_tables
     original_adapter = ActiveJob::Base.queue_adapter
 
     FullSearch::TestHelpers.setup_for_tests!
@@ -84,11 +85,13 @@ class FullSearch::TestHelpersTest < ActiveSupport::TestCase
     refute FullSearch.config.lock_rebuilds
     assert FullSearch.config.auto_rebuild_on_stale_query
     assert_equal :raise, FullSearch.config.stale_query_behavior
+    assert FullSearch.config.auto_rebuild_missing_tables
     assert_instance_of ActiveJob::QueueAdapters::InlineAdapter, ActiveJob::Base.queue_adapter
   ensure
     FullSearch.config.lock_rebuilds = original_lock_rebuilds
     FullSearch.config.auto_rebuild_on_stale_query = original_auto_rebuild
     FullSearch.config.stale_query_behavior = original_stale_behavior
+    FullSearch.config.auto_rebuild_missing_tables = original_auto_rebuild_missing
     ActiveJob::Base.queue_adapter = original_adapter
   end
 

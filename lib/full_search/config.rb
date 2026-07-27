@@ -5,7 +5,7 @@ module FullSearch
     attr_accessor :auto_rebuild_schema, :stale_query_behavior, :lock_rebuilds,
       :default_async_reindex, :default_async_source_reindex,
       :default_tokenizer, :auto_rebuild_on_stale_query, :min_like_prefix_length,
-      :dump_schema_virtual_tables
+      :dump_schema_virtual_tables, :auto_rebuild_missing_tables
 
     def initialize
       @auto_rebuild_schema = false
@@ -17,6 +17,7 @@ module FullSearch
       @auto_rebuild_on_stale_query = false
       @min_like_prefix_length = FullSearch::Constants::DEFAULT_MIN_LIKE_PREFIX_LENGTH
       @dump_schema_virtual_tables = true
+      @auto_rebuild_missing_tables = false
     end
   end
 

@@ -8,6 +8,7 @@ module FullSearch
           config.lock_rebuilds = false
           config.auto_rebuild_on_stale_query = true
           config.stale_query_behavior = :raise
+          config.auto_rebuild_missing_tables = true
         end
 
         inline_active_job_if_configured

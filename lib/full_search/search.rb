@@ -84,6 +84,11 @@ module FullSearch
 
     def check_stale_config!
       if FullSearch::Index.missing_table?(model)
+        if FullSearch.config.auto_rebuild_missing_tables
+          FullSearch::Index.rebuild!(model)
+          return
+        end
+
         raise MissingTableError, "FTS table `#{FullSearch::Index.fts_table_name(model)}` does not exist. Run `bin/rails full_search:prepare` to create it."
       end
 
