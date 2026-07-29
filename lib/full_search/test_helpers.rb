@@ -43,6 +43,11 @@ module FullSearch
       models.each { |model| rebuild_full_search_index(model) }
     end
 
+    def truncate_full_search!(*models)
+      models = FullSearch.models.to_a if models.empty?
+      models.each { |model| FullSearch::Index.truncate!(model) }
+    end
+
     def ensure_full_search_tables
       FullSearch.models.each do |model|
         FullSearch::Index.ensure_table!(model)

@@ -102,6 +102,32 @@ class FullSearch::IndexTest < ActiveSupport::TestCase
     refute FullSearch::Index.send(:table_exists?, @model)
   end
 
+  def test_truncate_removes_rows_but_preserves_table
+    account = Account.create!(name: "Acme")
+    @model.create!(account_id: account.id, first_name: "Sam", last_name: "Smith")
+    FullSearch::Index.rebuild!(@model)
+
+    rows_before = ActiveRecord::Base.connection.execute(
+      "SELECT COUNT(*) AS c FROM #{FullSearch::Index.fts_table_name(@model)}"
+    ).first["c"]
+    assert_equal 1, rows_before
+
+    FullSearch::Index.truncate!(@model)
+
+    rows_after = ActiveRecord::Base.connection.execute(
+      "SELECT COUNT(*) AS c FROM #{FullSearch::Index.fts_table_name(@model)}"
+    ).first["c"]
+    assert_equal 0, rows_after
+    assert FullSearch::Index.send(:table_exists?, @model)
+  end
+
+  def test_truncate_is_safe_when_table_missing
+    FullSearch::Index.drop!(@model)
+    refute FullSearch::Index.send(:table_exists?, @model)
+
+    assert_nothing_raised { FullSearch::Index.truncate!(@model) }
+  end
+
   def test_missing_table_returns_true_when_table_does_not_exist
     FullSearch::Index.drop!(@model)
     assert FullSearch::Index.missing_table?(@model)

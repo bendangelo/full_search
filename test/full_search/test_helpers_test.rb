@@ -73,6 +73,32 @@ class FullSearch::TestHelpersTest < ActiveSupport::TestCase
     end
   end
 
+  def test_truncate_removes_rows_but_keeps_tables
+    account = Account.create!(name: "Acme")
+    record = @model.new(account_id: account.id, first_name: "Sam", last_name: "Smith")
+    rebuild_full_search_index(@model)
+    record.save!
+
+    assert_includes @model.full_search("Sam", filters: {account_id: account.id}).to_a, record
+
+    truncate_full_search!(@model)
+
+    assert_empty @model.full_search("Sam", filters: {account_id: account.id}).to_a
+    assert FullSearch::Index.send(:table_exists?, @model)
+  end
+
+  def test_truncate_without_arguments_truncates_all_models
+    account = Account.create!(name: "Acme")
+    record = @model.create!(account_id: account.id, first_name: "Sam", last_name: "Smith")
+    rebuild_full_search_index(@model)
+
+    assert_includes @model.full_search("Sam", filters: {account_id: account.id}).to_a, record
+
+    truncate_full_search!(@model)
+
+    assert_empty @model.full_search("Sam", filters: {account_id: account.id}).to_a
+  end
+
   def test_setup_for_tests_disables_lock_rebuilds_and_enables_inline_jobs
     original_lock_rebuilds = FullSearch.config.lock_rebuilds
     original_auto_rebuild = FullSearch.config.auto_rebuild_on_stale_query

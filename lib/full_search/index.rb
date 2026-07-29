@@ -154,6 +154,18 @@ module FullSearch
         end
       end
 
+      def truncate!(model)
+        IndexCache.clear!
+        sqlite!(model)
+        dsl = model.full_search_dsl
+        return unless dsl
+        return unless table_exists?(model)
+
+        conn = connection
+        conn.execute("DELETE FROM #{qt(fts_table_name(model))};")
+        conn.execute("DELETE FROM #{qt(trigram_table_name(model))};") if trigram_table_needed?(model) && trigram_table_exists?(model)
+      end
+
       def drop!(model)
         IndexCache.clear!
         verified_tables.delete(model.table_name)
