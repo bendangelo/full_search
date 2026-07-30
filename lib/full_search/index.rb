@@ -71,8 +71,8 @@ module FullSearch
         with_rebuild_lock(model) do
           FullSearch::Instrumentation.instrument("rebuild", model: model.name) do
             drop_triggers!(model)
-            conn.execute("DROP TABLE IF EXISTS #{qt(fts_table_name(model))};")
-            conn.execute("DROP TABLE IF EXISTS #{qt(trigram_table_name(model))};")
+            drop_fts_table_safely!(fts_table_name(model))
+            drop_fts_table_safely!(trigram_table_name(model))
             conn.execute(create_virtual_table_sql(model))
             if trigram_table_needed?(model)
               FullSearch::Typo.warn_unsupported!(model) unless FullSearch::Typo.supported?(model)
@@ -181,8 +181,32 @@ module FullSearch
         verified_tables.delete(model.table_name)
         sqlite!(model)
         drop_triggers!(model)
-        connection.execute("DROP TABLE IF EXISTS #{qt(fts_table_name(model))};")
-        connection.execute("DROP TABLE IF EXISTS #{qt(trigram_table_name(model))};")
+        drop_fts_table_safely!(fts_table_name(model))
+        drop_fts_table_safely!(trigram_table_name(model))
+      end
+      # Drops an FTS5 virtual table, recovering from corruption where a bare
+      # DROP TABLE IF EXISTS raises "invalid fts5 file format" because the
+      # shadow tables were tampered with out-of-band. When that happens we
+      # drop the shadow tables directly, then drop the (now-empty) virtual
+      # table wrapper, so the caller can recreate a clean index.
+      def drop_fts_table_safely!(table_name)
+        connection.execute("DROP TABLE IF EXISTS #{qt(table_name)};")
+      rescue ActiveRecord::StatementInvalid => e
+        raise unless e.message.match?(/fts5: corruption|invalid fts5 file format|malformed database schema/i)
+
+        drop_shadow_tables!(table_name)
+        connection.execute("DROP TABLE IF EXISTS #{qt(table_name)};")
+      end
+
+      # FTS5 stores its index data in a fixed set of shadow tables named
+      # <table>_content, <table>_data, <table>_idx, <table>_docsize and
+      # <table>_config. Dropping these lets SQLite recover a virtual table
+      # that is otherwise undroppable due to internal corruption.
+      def drop_shadow_tables!(table_name)
+        %w[content data idx docsize config].each do |suffix|
+          shadow = "#{table_name}_#{suffix}"
+          connection.execute("DROP TABLE IF EXISTS #{qt(shadow)};")
+        end
       end
 
       def fts_table_name(model)
