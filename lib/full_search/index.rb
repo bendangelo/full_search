@@ -29,6 +29,10 @@ module FullSearch
 
         create_metadata_table!
 
+        if table_exists?(model) && !healthy?(model)
+          rebuild!(model)
+        end
+
         fts_was_created = false
         unless table_exists?(model)
           conn.execute(create_virtual_table_sql(model))
@@ -162,8 +166,14 @@ module FullSearch
         return unless table_exists?(model)
 
         conn = connection
-        conn.execute("DELETE FROM #{qt(fts_table_name(model))};")
-        conn.execute("DELETE FROM #{qt(trigram_table_name(model))};") if trigram_table_needed?(model) && trigram_table_exists?(model)
+        begin
+          conn.execute("DELETE FROM #{qt(fts_table_name(model))};")
+          conn.execute("DELETE FROM #{qt(trigram_table_name(model))};") if trigram_table_needed?(model) && trigram_table_exists?(model)
+        rescue ActiveRecord::StatementInvalid => e
+          raise unless e.message.match?(/fts5: corruption|invalid fts5 file format|malformed database schema/i)
+
+          rebuild!(model)
+        end
       end
 
       def drop!(model)
@@ -209,6 +219,17 @@ module FullSearch
 
       def missing_table?(model)
         !table_exists?(model)
+      end
+
+      def healthy?(model)
+        return false unless table_exists?(model)
+
+        connection.execute("SELECT count(*) FROM #{qt(fts_table_name(model))}")
+        true
+      rescue ActiveRecord::StatementInvalid => e
+        raise unless e.message.match?(/fts5: corruption|invalid fts5 file format|malformed database schema/i)
+
+        false
       end
 
       def trigram_table_needed?(model)
