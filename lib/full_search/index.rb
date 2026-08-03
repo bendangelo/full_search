@@ -184,6 +184,7 @@ module FullSearch
         drop_fts_table_safely!(fts_table_name(model))
         drop_fts_table_safely!(trigram_table_name(model))
       end
+
       # Drops an FTS5 virtual table, recovering from corruption where a bare
       # DROP TABLE IF EXISTS raises "invalid fts5 file format" because the
       # shadow tables were tampered with out-of-band. When that happens we

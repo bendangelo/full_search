@@ -30,6 +30,7 @@ require "full_search/backfill_job"
 require "full_search/test_helpers"
 require "full_search/multi_search"
 require "full_search/schema_dumper_patch"
+require "full_search/once_rebuilt"
 
 ActiveSupport.on_load(:active_record) do
   include FullSearch::Model

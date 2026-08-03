@@ -54,6 +54,10 @@ module FullSearch
       end
     end
 
+    def once_full_search_rebuilt(*models, &block)
+      FullSearch::OnceRebuilt.per_test_case(*models, &block)
+    end
+
     def with_full_search_rebuild(model)
       model = resolve_full_search_model(model)
       rebuild_full_search_index(model)
