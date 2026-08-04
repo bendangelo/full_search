@@ -167,8 +167,8 @@ module FullSearch
 
         conn = connection
         begin
-          conn.execute("DELETE FROM #{qt(fts_table_name(model))};")
-          conn.execute("DELETE FROM #{qt(trigram_table_name(model))};") if trigram_table_needed?(model) && trigram_table_exists?(model)
+          with_busy_retry { conn.execute("DELETE FROM #{qt(fts_table_name(model))};") }
+          with_busy_retry { conn.execute("DELETE FROM #{qt(trigram_table_name(model))};") } if trigram_table_needed?(model) && trigram_table_exists?(model)
         rescue ActiveRecord::StatementInvalid => e
           raise unless e.message.match?(/fts5: corruption|invalid fts5 file format|malformed database schema/i)
 
@@ -191,12 +191,12 @@ module FullSearch
       # drop the shadow tables directly, then drop the (now-empty) virtual
       # table wrapper, so the caller can recreate a clean index.
       def drop_fts_table_safely!(table_name)
-        connection.execute("DROP TABLE IF EXISTS #{qt(table_name)};")
+        with_busy_retry { connection.execute("DROP TABLE IF EXISTS #{qt(table_name)};") }
       rescue ActiveRecord::StatementInvalid => e
         raise unless e.message.match?(/fts5: corruption|invalid fts5 file format|malformed database schema/i)
 
         drop_shadow_tables!(table_name)
-        connection.execute("DROP TABLE IF EXISTS #{qt(table_name)};")
+        with_busy_retry { connection.execute("DROP TABLE IF EXISTS #{qt(table_name)};") }
       end
 
       # FTS5 stores its index data in a fixed set of shadow tables named
@@ -249,12 +249,14 @@ module FullSearch
       def healthy?(model)
         return false unless table_exists?(model)
 
-        connection.execute("SELECT count(*) FROM #{qt(fts_table_name(model))}")
-        true
-      rescue ActiveRecord::StatementInvalid => e
-        raise unless e.message.match?(/fts5: corruption|invalid fts5 file format|malformed database schema/i)
+        begin
+          with_busy_retry { connection.execute("SELECT count(*) FROM #{qt(fts_table_name(model))}") }
+          true
+        rescue ActiveRecord::StatementInvalid => e
+          raise unless e.message.match?(/fts5: corruption|invalid fts5 file format|malformed database schema/i)
 
-        false
+          false
+        end
       end
 
       def trigram_table_needed?(model)
@@ -284,6 +286,22 @@ module FullSearch
       end
 
       private
+
+      BUSY_RETRIES = 3
+      BUSY_BACKOFF = 0.1
+
+      def with_busy_retry
+        attempts = 0
+        begin
+          yield
+        rescue ActiveRecord::StatementInvalid => e
+          raise unless e.message.match?(/database is locked/i) && attempts < BUSY_RETRIES
+          attempts += 1
+          sleep(BUSY_BACKOFF * attempts)
+          IndexCache.clear!
+          retry
+        end
+      end
 
       def connection
         ActiveRecord::Base.connection

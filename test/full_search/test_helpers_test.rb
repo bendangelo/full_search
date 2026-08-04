@@ -89,8 +89,8 @@ class FullSearch::TestHelpersTest < ActiveSupport::TestCase
 
   def test_truncate_without_arguments_truncates_all_models
     account = Account.create!(name: "Acme")
-    record = @model.create!(account_id: account.id, first_name: "Sam", last_name: "Smith")
     rebuild_full_search_index(@model)
+    record = @model.create!(account_id: account.id, first_name: "Sam", last_name: "Smith")
 
     assert_includes @model.full_search("Sam", filters: {account_id: account.id}).to_a, record
 
