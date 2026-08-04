@@ -68,6 +68,22 @@ class FullSearch::BulkImportTest < ActiveSupport::TestCase
     assert_equal 1, results.to_a.length
   end
 
+  def test_end_bulk_import_raises_when_trigger_restore_fails
+    # Simulate create_triggers! failing so the ensure path can't restore triggers.
+    original = FullSearch::Index.method(:create_triggers!)
+    FullSearch::Index.define_singleton_method(:create_triggers!) { |*_args| raise StandardError, "DDL explosion" }
+
+    assert_raises(FullSearch::TriggerRestoreError) do
+      FullSearch.bulk_import(@model) {}  # triggers dropped in start, restore fails in end
+    end
+
+    # Triggers are still dropped — the caller now knows instead of silent rot.
+    assert FullSearch::Index.missing_triggers?(@model), "triggers should remain dropped after failed restore"
+  ensure
+    FullSearch::Index.define_singleton_method(:create_triggers!, original) if original
+    FullSearch::Index.rebuild!(@model)
+  end
+
   def test_ensure_table_skips_triggers_during_bulk_import
     FullSearch::Index.drop!(@model)
     FullSearch::Index.verified_tables.delete(@model.table_name)

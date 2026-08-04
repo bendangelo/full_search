@@ -92,6 +92,21 @@ module FullSearch
         raise MissingTableError, "FTS table `#{FullSearch::Index.fts_table_name(model)}` does not exist. Run `bin/rails full_search:prepare` to create it."
       end
 
+      if FullSearch::Index.missing_triggers?(model)
+        if FullSearch.config.auto_rebuild_on_stale_query
+          FullSearch::Index.rebuild!(model)
+          return
+        end
+
+        case FullSearch.config.stale_query_behavior
+        when :raise
+          raise ConfigChangedError, "FTS triggers for #{model.table_name} are missing; run full_search:rebuild"
+        when :log_and_fallback
+          Rails.logger.warn("[full_search] FTS triggers for #{model.table_name} are missing; results may be incomplete")
+        end
+        return
+      end
+
       stored = begin
         FullSearch::Index.stored_config_hash(model)
       rescue ActiveRecord::StatementInvalid

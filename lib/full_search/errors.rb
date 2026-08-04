@@ -10,4 +10,5 @@ module FullSearch
   class UnsupportedDatabaseError < Error; end
   class MissingTableError < Error; end
   class InvalidQueryError < Error; end
+  class TriggerRestoreError < Error; end
 end

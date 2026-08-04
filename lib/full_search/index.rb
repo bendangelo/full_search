@@ -267,6 +267,22 @@ module FullSearch
         ).any?
       end
 
+      def missing_triggers?(model)
+        return false if FullSearch.bulk_importing?(model)
+        return false unless model_table_exists?(model)
+        return false unless table_exists?(model)
+
+        IndexCache.fetch("missing_triggers:#{model.table_name}") do
+          existing = connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name=#{q(model.table_name)}"
+          ).map { |r| r["name"] }
+
+          expected = trigger_names(model)
+          expected += trigram_trigger_names(model) if trigram_table_needed?(model)
+          (expected - existing).any?
+        end
+      end
+
       private
 
       def connection
@@ -290,9 +306,11 @@ module FullSearch
       end
 
       def model_table_exists?(model)
-        connection.execute(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name=#{q(model.table_name)} LIMIT 1"
-        ).any?
+        IndexCache.fetch("model_table_exists:#{model.table_name}") do
+          connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=#{q(model.table_name)} LIMIT 1"
+          ).any?
+        end
       end
 
       def table_exists?(model)
@@ -354,16 +372,7 @@ module FullSearch
 
       def ensure_triggers!(model)
         return if FullSearch.bulk_importing?(model)
-
-        existing = connection.execute(
-          "SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name=#{q(model.table_name)}"
-        ).map { |r| r["name"] }
-
-        expected = trigger_names(model)
-        expected += trigram_trigger_names(model) if trigram_table_needed?(model)
-        return if (expected - existing).empty? && (existing - expected).empty?
-
-        rebuild!(model)
+        rebuild!(model) if missing_triggers?(model)
       end
 
       def trigger_names(model)
@@ -377,6 +386,8 @@ module FullSearch
         base = trigram_table_name(model)
         %W[#{base}_ai #{base}_ad #{base}_au]
       end
+
+      private
 
       def insert_trigger_sql(model)
         dsl = model.full_search_dsl

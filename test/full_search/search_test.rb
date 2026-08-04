@@ -219,6 +219,42 @@ class FullSearch::SearchTest < ActiveSupport::TestCase
     FullSearch.config.auto_rebuild_on_stale_query = original
   end
 
+  def test_search_self_heals_when_triggers_missing
+    original = FullSearch.config.auto_rebuild_on_stale_query
+    FullSearch.config.auto_rebuild_on_stale_query = true
+
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name
+        filter :account_id, required: true
+      end
+    end
+    model.table_name = "customers"
+    account = Account.create!(name: "Acme")
+    FullSearch::Index.rebuild!(model)
+
+    # Drop triggers, then insert a record that the FTS index will miss.
+    FullSearch::Index.drop_triggers!(model)
+    second = model.create!(account_id: account.id, first_name: "Marcus")
+    assert FullSearch::Index.missing_triggers?(model), "triggers should be missing"
+
+    # Querying should self-heal: rebuild the index (restoring triggers +
+    # backfilling the new record) and return both records.
+    results = model.full_search("Marcus", filters: {account_id: account.id})
+    assert_includes results.to_a, second, "self-heal should find the record inserted while triggers were dropped"
+    refute FullSearch::Index.missing_triggers?(model), "triggers should be restored after self-heal"
+
+    # A follow-up insert should now be indexed by triggers (no rebuild needed).
+    third = model.create!(account_id: account.id, first_name: "Priya")
+    results = model.full_search("Priya", filters: {account_id: account.id})
+    assert_includes results.to_a, third, "triggers should index new records after self-heal"
+  ensure
+    FullSearch.config.auto_rebuild_on_stale_query = original
+    FullSearch::Index.drop!(model) if defined?(model) && model.respond_to?(:table_name)
+    Customer.delete_all
+    Account.delete_all
+  end
+
   def test_no_stored_config_does_not_raise
     ActiveRecord::Base.connection.execute(
       "DELETE FROM full_search_index_versions WHERE table_name = 'customers'"

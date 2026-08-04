@@ -12,40 +12,42 @@ module FullSearch
     end
 
     def call
-      searched = groups.map do |group|
-        model = fetch(group, :model)
-        raise FullSearch::NotConfiguredError, "#{model} is not full_search configured" unless model.full_search_dsl
+      IndexCache.with_cache do
+        searched = groups.map do |group|
+          model = fetch(group, :model)
+          raise FullSearch::NotConfiguredError, "#{model} is not full_search configured" unless model.full_search_dsl
 
-        filters = group[:filters] || {}
-        limit = positive_integer(group[:limit], 8)
-        offset = positive_integer(group[:offset], 0)
-        raw_limit = limit + 1
+          filters = group[:filters] || {}
+          limit = positive_integer(group[:limit], 8)
+          offset = positive_integer(group[:offset], 0)
+          raw_limit = limit + 1
 
-        relation = model.full_search(
-          query,
-          filters: filters,
-          limit: raw_limit,
-          offset: offset,
-          highlight: group[:highlight],
-          highlight_fields: group[:highlight_fields],
-          matching_strategy: group[:matching_strategy],
-          per_strategy_limit: group[:per_strategy_limit],
-          scope: group[:scope],
-          includes: group[:includes]
-        )
+          relation = model.full_search(
+            query,
+            filters: filters,
+            limit: raw_limit,
+            offset: offset,
+            highlight: group[:highlight],
+            highlight_fields: group[:highlight_fields],
+            matching_strategy: group[:matching_strategy],
+            per_strategy_limit: group[:per_strategy_limit],
+            scope: group[:scope],
+            includes: group[:includes]
+          )
 
-        records = relation.to_a
-        has_more = records.size > limit
-        records = records.first(limit) if has_more
+          records = relation.to_a
+          has_more = records.size > limit
+          records = records.first(limit) if has_more
 
-        group.slice(:key, :label, :icon, :model).merge(
-          results: records,
-          has_more: has_more,
-          total_count: records.size
-        )
+          group.slice(:key, :label, :icon, :model).merge(
+            results: records,
+            has_more: has_more,
+            total_count: records.size
+          )
+        end
+
+        {groups: searched, total_count: searched.sum { |g| g[:total_count] }}
       end
-
-      {groups: searched, total_count: searched.sum { |g| g[:total_count] }}
     end
 
     private

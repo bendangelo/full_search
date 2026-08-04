@@ -312,6 +312,31 @@ class FullSearch::IndexTest < ActiveSupport::TestCase
     end
   end
 
+  def test_missing_triggers_detected_after_drop
+    model = Class.new(Customer) do
+      full_search do
+        field :first_name, weight: 5
+        filter :account_id, required: true
+      end
+    end
+    model.table_name = "customers"
+
+    begin
+      FullSearch::Index.rebuild!(model)
+      refute FullSearch::Index.missing_triggers?(model), "triggers should be present after rebuild"
+
+      FullSearch::Index.drop_triggers!(model)
+      assert FullSearch::Index.missing_triggers?(model), "should detect dropped triggers"
+
+      FullSearch::Index.rebuild!(model)
+      refute FullSearch::Index.missing_triggers?(model), "triggers should be restored after rebuild"
+    ensure
+      FullSearch::Index.drop!(model)
+      Customer.delete_all
+      Account.delete_all
+    end
+  end
+
   def test_trigram_column_uses_as_alias
     model = Class.new(Customer) do
       full_search do

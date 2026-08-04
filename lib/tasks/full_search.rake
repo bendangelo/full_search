@@ -105,7 +105,9 @@ namespace :full_search do
         ""
       end
 
-      puts "#{model.table_name}: #{status}#{drift_info}"
+      trigger_info = FullSearch::Index.missing_triggers?(model) ? " | MISSING TRIGGERS" : ""
+
+      puts "#{model.table_name}: #{status}#{drift_info}#{trigger_info}"
     end
   end
 
@@ -118,6 +120,10 @@ namespace :full_search do
       if FullSearch::Index.missing_table?(model)
         unhealthy << "#{model.table_name}: missing FTS table"
         next
+      end
+
+      if FullSearch::Index.missing_triggers?(model)
+        unhealthy << "#{model.table_name}: missing FTS triggers"
       end
 
       stored = FullSearch::Index.stored_config_hash(model)
